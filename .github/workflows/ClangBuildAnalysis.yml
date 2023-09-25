@@ -34,8 +34,12 @@ jobs:
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release .. -G Ninja
           ninja
+<<<<<<< HEAD
           echo ":/Users/runner/work/srcML/srcML/analyzer/build" >> $GITHUB_PATH
           ls -lh /Users/runner/work/srcML/srcML/analyzer/build
+=======
+          sudo cp ClangBuildAnalyzer /usr/local/bin
+>>>>>>> upstream/issue1942
 
       - name: Create build directory
         shell: bash
@@ -60,7 +64,10 @@ jobs:
         shell: bash
         working-directory: build
         run: |
+<<<<<<< HEAD
           export PATH="$PATH:/Users/runner/work/srcML/srcML/analyzer/build"
+=======
+>>>>>>> upstream/issue1942
           ClangBuildAnalyzer --all src/parser capture_pch_parser
           ClangBuildAnalyzer --analyze capture_pch_parser > capture_pch_parser.txt
           ClangBuildAnalyzer --all src/libsrcml capture_pch_libsrcml
@@ -87,7 +94,10 @@ jobs:
         shell: bash
         working-directory: build
         run: |
+<<<<<<< HEAD
           export PATH="$PATH:/Users/runner/work/srcML/srcML/analyzer/build"
+=======
+>>>>>>> upstream/issue1942
           ClangBuildAnalyzer --all src/parser capture_nopch_parser
           ClangBuildAnalyzer --analyze capture_nopch_parser > capture_nopch_parser.txt
           ClangBuildAnalyzer --all src/libsrcml capture_nopch_libsrcml

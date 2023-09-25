@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file StreamMLParser.hpp
  *
  * @copyright Copyright (C) 2002-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML Toolkit.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  * Adds markup language capabilities and stream parsing to a Parser
  * class.  The stream parsing is added by the srcMLParser class, StreamParser.
@@ -27,14 +14,14 @@
 #define INCLUDED_STREAM_MLPARSER_HPP
 
 #include <antlr/TokenStream.hpp>
-#include "TokenStream.hpp"
+#include <TokenStream.hpp>
 
 #include <deque>
 #include <stack>
 #include <cassert>
 
-#include "srcMLToken.hpp"
-#include "srcMLParser.hpp"
+#include <srcMLToken.hpp>
+#include <srcMLParser.hpp>
 
 /**
  * StreamMLParser
@@ -152,7 +139,7 @@ private:
 
         // Always handled as white space and hidden from
         // parsing
-        if (srcMLParser::whitespace_token_set.member(token_type))
+        if (srcMLParser::whitespace_token_set.member(static_cast<unsigned long>(token_type)))
             return true;
 
         // whether to handle a line comment start or an EOL
@@ -211,7 +198,7 @@ private:
         ntoken->setLine(LT(1)->getLine());
         ntoken->setColumn(LT(1)->getColumn());
 
-        if (isoption(options, SRCML_OPTION_POSITION)) {
+        if (isoption(options, SRCML_PARSER_OPTION_POSITION)) {
             ends.emplace(ntoken);
         }
 
@@ -225,7 +212,7 @@ private:
         ntoken->setLine(LT(1)->getLine());
         ntoken->setColumn(LT(1)->getColumn());
 
-        if (isoption(options, SRCML_OPTION_POSITION)) {
+        if (isoption(options, SRCML_PARSER_OPTION_POSITION)) {
             ends.emplace(ntoken);
         }
 
@@ -251,7 +238,7 @@ private:
             ntoken->setColumn(lasttypestartcolumn);
         }
 
-        if (isoption(options, SRCML_OPTION_POSITION)) {
+        if (isoption(options, SRCML_PARSER_OPTION_POSITION)) {
             ends.emplace(ntoken);
         }
 
@@ -272,7 +259,7 @@ private:
 
         // end position info is needed from the matching last end token
         // that was enqueued
-        if (isoption(options, SRCML_OPTION_POSITION)) {
+        if (isoption(options, SRCML_PARSER_OPTION_POSITION)) {
             srcMLToken* qetoken = static_cast<srcMLToken*>(&(*std::move(ends.top())));
 
             qetoken->endline = lastline;
@@ -299,7 +286,7 @@ private:
 
         // end position info is needed from the matching last end token
         // that was enqueued
-        if (isoption(options, SRCML_OPTION_POSITION)) {
+        if (isoption(options, SRCML_PARSER_OPTION_POSITION)) {
             srcMLToken* qetoken = static_cast<srcMLToken*>(&(*std::move(ends.top())));
             qetoken->endline = slastline;
             qetoken->endcolumn = slastcolumn;
@@ -505,7 +492,7 @@ private:
             return false;
 
         // preprocessor (unless we already are in one)
-        if (isoption(options, SRCML_OPTION_CPP) && srcMLParser::LA(1) == srcMLParser::PREPROC) {
+        if (isoption(options, SRCML_PARSER_OPTION_CPP) && srcMLParser::LA(1) == srcMLParser::PREPROC) {
 
             // start preprocessor handling
             inskip = true;
@@ -677,7 +664,7 @@ private:
         // to calculate end position, need to buffer until end token in reached
         // to prevent infinite loops, consume is called if no progress is made on the
         // current token, e.g., double max const();
-        if (isoption(options, SRCML_OPTION_POSITION)) {
+        if (isoption(options, SRCML_PARSER_OPTION_POSITION)) {
             auto curline = LT(1)->getLine();
             auto curcolumn = LT(1)->getColumn();
             while (ends.size() > 1) {
@@ -787,7 +774,7 @@ private:
      *
      * Push the a token onto the correct buffer.
      */
-    inline void pushCorrectToken(const antlr::RefToken& rtoken) {
+    inline void pushCorrectToken(const antlr::RefToken& /* rtoken */) {
 
         if (isSkipToken(srcMLParser::LA(1)))
 

@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file xsltTransformation.cpp
  *
  * @copyright Copyright (C) 2008-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML Toolkit.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <xsltTransformation.hpp>
@@ -27,17 +14,13 @@
 
 #include <srcml_sax2_utilities.hpp>
 
-#ifdef DLLOAD
-#include <dlfcn.h>
-#else
 #include <libxslt/xslt.h>
 #include <libxslt/xsltInternals.h>
 #include <libxslt/xsltutils.h>
 #include <libxslt/transform.h>
 #include <libexslt/exslt.h>
-#endif
 
-#ifdef _MSC_BUILD
+#ifdef _MSC_VER
 #include <io.h>
 #endif
 
@@ -51,61 +34,6 @@
  */
 xsltTransformation::xsltTransformation(/* OPTION_TYPE& options, */ xmlDocPtr xslt, const std::vector<std::string>& params)
         : params(params) {
-
-#ifdef DLLOAD
-
-    libxslt_handle = dlopen_libxslt();
-    if (!libxslt_handle) {
-        fprintf(stderr, "Unable to open libxslt library\n");
-        throw;
-    }
-
-    char* error;
-
-    dlerror();
-    *(void**)(&xsltApplyStylesheetUser) = dlsym(libxslt_handle, "xsltApplyStylesheetUser");
-    if ((error = dlerror()) != NULL) {
-        dlclose(libxslt_handle);
-        libxslt_handle = 0;
-        throw;
-    }
-
-    dlerror();
-    *(void**)(&xsltParseStylesheetDoc) = dlsym(libxslt_handle, "xsltParseStylesheetDoc");
-    if ((error = dlerror()) != NULL) {
-        dlclose(libxslt_handle);
-        libxslt_handle = 0;
-        throw;
-    }
-
-    dlerror();
-    *(void**)(&xsltCleanupGlobals) = dlsym(libxslt_handle, "xsltCleanupGlobals");
-    if ((error = dlerror()) != NULL) {
-        dlclose(libxslt_handle);
-        libxslt_handle = 0;
-        throw;
-    }
-
-    dlerror();
-    *(void**)(&xsltFreeStylesheet) = dlsym(libxslt_handle, "xsltFreeStylesheet");
-    if ((error = dlerror()) != NULL) {
-        dlclose(libxslt_handle);
-        libxslt_handle = 0;
-        throw;
-    }
-
-    libexslt_handle = dlopen_libexslt();
-
-    // allow for all exslt functions
-    typedef void (*exsltRegisterAll_t)();
-    dlerror();
-    exsltRegisterAll_t exsltRegisterAll;
-    *(void **) (&exsltRegisterAll) = dlsym(libexslt_handle, "exsltRegisterAll");
-    if ((error = dlerror()) != NULL) {
-        dlclose(libexslt_handle);
-        throw;
-    }
-#endif
 
     // allow for all exslt functions
     exsltRegisterAll();
@@ -126,11 +54,6 @@ xsltTransformation::~xsltTransformation() {
     xsltFreeStylesheet(stylesheet);
 
     xsltCleanupGlobals();
-
-#ifdef DLLOAD
-    dlclose(libxslt_handle);
-    dlclose(libexslt_handle);
-#endif
 }
 
 /**
@@ -145,7 +68,7 @@ TransformationResult xsltTransformation::apply(xmlDocPtr doc, int /* position */
     // convert to c-array of c-strings, null terminated
     std::vector<const char*> cparams(xsl_parameters.size() + 1);
     for (size_t i = 0; i < xsl_parameters.size(); ++i) {
-        cparams[i] = xsl_parameters[i].c_str();
+        cparams[i] = xsl_parameters[i].data();
     }
     cparams.back() = 0;
 

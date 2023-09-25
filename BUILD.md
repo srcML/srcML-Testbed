@@ -1,6 +1,6 @@
 # Building srcML
 
-srcML is built using cmake, www.cmake.org, (version 2.8.12 or above) and currently supports builds for
+srcML is built using cmake, www.cmake.org, (version 3.24 or above) and currently supports builds for
 macOS, Fedora, Ubuntu, CentOS, OpenSUSE, and Windows Visual Studio.
 
 Out of source builds (builds outside the source directory) are required. In source builds are not supported.
@@ -31,14 +31,10 @@ The main packages required may be installed via brew:
 
     brew install antlr2 boost cmake
 
-The srcML client requires at least LibArchive 3. macOS includes version 2.8. Because of this, LibArchive is
-statically linked into the client. There are two options
-
-* Use brew to install a more recent version:
+Libarchive greater than 3.0.0 is required. For macOS previous to Catalina (19.*.*), libarchive.a 3.3.* must be 
+statically included. Use brew to install a more recent version:
 
     `brew install libarchive`
-
-* Download and build LibArchive in a directory `libarchive` parallel to the source directory, typically \~/libarchive
 
 To generate srcML documentation:
 

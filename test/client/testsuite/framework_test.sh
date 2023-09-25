@@ -44,10 +44,14 @@ cd $TEMPDIR
 export PATH=.:$PATH
 
 if [[ "$OSTYPE" == 'msys' ]]; then
-	SRCML=$SRCML_HOME/srcml
+    EOL="\r\n"
+    export PATH=$PATH:"/c/Program Files/srcML/bin/"
+    SRCML="$SRCML_HOME/srcml.exe"
+    export MSYS2_ARG_CONV_EXCL="*"
 	diff='diff -Z '
 else
-	diff='diff'
+    EOL="\n"
+	diff='diff '
 	if [ -z "$SRCML"]; then
 
 	    if [ -e "/usr/bin/srcml" ]; then
@@ -62,9 +66,8 @@ else
 fi
 
 function srcml () {
-    env $SRCML_CLIENT_TEST_PREFIX $SRCML "$@"
+    "$SRCML" "$@"
 }
-
 # turn history on so we can output the command issued
 # note that the fc command accesses the history
 set -o history
@@ -90,9 +93,6 @@ define() {
     eval $1=\${$1//REVISION/${REVISION}}
 }
 
-# variable $1 is set to the contents of file $2
-readfile() { ${1}="$(< $2)"; }
-
 # file with name $1 is created from the contents of string variable $2
 # created files are recorded so that cleanup can occur
 createfile() {
@@ -104,6 +104,8 @@ createfile() {
 }
 
 rmfile() { rm -f ${1}; }
+
+rmdir()  { rm -fr ${1}; }
 
 # capture stdout and stderr
 capture_output() {
@@ -131,6 +133,7 @@ message() {
 
 # output filenames for capturing stdout and stderr from the command
 base=$(basename $0 .sh)
+
 typeset STDERR=.stderr_$base
 typeset STDOUT=.stdout_$base
 
@@ -148,73 +151,9 @@ check() {
 
     set -e
 
-    # return stdout and stderr to standard streams
-    uncapture_output
-
-    # trace the command
-    firsthistoryentry
-
-    # NOTE: All diff checks with pipeline fail twice to avoid intermittent
-    #       '/dev/fd/63' errors
-
-    # check <filename> stdoutstr stderrstr
-    if [ $# -ge 3 ]; then
-
-        $diff <(echo -en "$2") $1 || $diff <(echo -en "$2") $1
-        $diff <(echo -en "$3") $STDERR || $diff <(echo -en "$3") $STDERR
-
-    # check <filename> stdoutstr
-    # note: empty string reports as a valid file
-    elif [ $# -ge 2 ] && [ "$1" != "" ] && [ -e "$1" ]; then
-
-        $diff <(echo -en "$2") $1 || $diff <(echo -en "$2") $1
-        [ ! -s $STDERR ]
-
-    # check stdoutstr stderrstr
-    elif [ $# -ge 2 ]; then
-
-        $diff <(echo -en "$1") $STDOUT || $diff <(echo -en "$1") $STDOUT
-        $diff <(echo -en "$2") $STDERR || $diff <(echo -en "$2") $STDERR
-
-    # check <filename>
-    elif [ $# -ge 1 ] && [ "$1" != "" ] && [ -e "$1" ]; then
-        $diff $1 $STDOUT
-        [ ! -s $STDERR ]
-
-    # check stdoutstr
-    elif [ $# -ge 1 ]; then
-
-        $diff <(echo -en "$1") $STDOUT || $diff <(echo -en "$1") $STDOUT
-        [ ! -s $STDERR ]
-
-    else
-        # check that the captured stdout is empty
-        [ ! -s $STDOUT ]
-        [ ! -s $STDERR ]
-    fi
-
-    set +e
-
-    if [ $exit_status -ne 0 ]; then
-        exit 1
-    fi
-
-    # return to capturing stdout and stderr
-    capture_output
-
-    true
-}
-
-##
-# checks the result of a command
-#
-# If stdout is not specified, it is assumed to be empty
-# If stderr is not specified, it is assumed to be empty
-check_ignore() {
-
-    local exit_status=$?
-
-    set -e
+    # testfile pattern
+    line=$(caller | cut -d' ' -f1)
+    TEMPFILE=$PWD'/.test.'$line
 
     # return stdout and stderr to standard streams
     uncapture_output
@@ -222,43 +161,58 @@ check_ignore() {
     # trace the command
     firsthistoryentry
 
-    # NOTE: All diff checks with pipeline fail twice to avoid intermittent
-    #       '/dev/fd/63' errors
-
     # check <filename> stdoutstr stderrstr
     if [ $# -ge 3 ]; then
 
-        $diff <(echo -en "$2") $1 || $diff <(echo -en "$2") $1
-        $diff <(echo -en "$3") $STDERR || $diff <(echo -en "$3") $STDERR
+        tmpfile2=$TEMPFILE.2
+        echo -en "$2" > $tmpfile2
+        $diff $tmpfile2 $1
+
+        tmpfile3=$TEMPFILE.3
+        echo -en "$3" > $tmpfile3
+        $diff $tmpfile3 $STDERR
 
     # check <filename> stdoutstr
     # note: empty string reports as a valid file
     elif [ $# -ge 2 ] && [ "$1" != "" ] && [ -e "$1" ]; then
 
-        $diff <(echo -en "$2") $1
-#        [ ! -s $STDERR ]
+        tmpfile2=$TEMPFILE.2
+        echo -en "$2" > $tmpfile2
+        $diff $tmpfile2 $1
+
+        [ ! -s $STDERR ]
 
     # check stdoutstr stderrstr
     elif [ $# -ge 2 ]; then
 
-        $diff <(echo -en "$1") $STDOUT || $diff <(echo -en "$1") $STDOUT
-        $diff <(echo -en "$2") $STDERR || $diff <(echo -en "$2") $STDERR
+        tmpfile1=$TEMPFILE.1
+        echo -en "$1" > $tmpfile1
+        $diff $tmpfile1 $STDOUT
+
+        tmpfile2=$TEMPFILE.2
+        echo -en "$2" > $tmpfile2
+        $diff $tmpfile2 $STDERR
 
     # check <filename>
     elif [ $# -ge 1 ] && [ "$1" != "" ] && [ -e "$1" ]; then
+
         $diff $1 $STDOUT
-#        [ ! -s $STDERR ]
+
+        [ ! -s $STDERR ]
 
     # check stdoutstr
     elif [ $# -ge 1 ]; then
 
-        $diff <(echo -en "$1") $STDOUT || $diff <(echo -en "$1") $STDOUT
- #       [ ! -s $STDERR ]
+        tmpfile1=$TEMPFILE.1
+        echo -en "$1" > $tmpfile1
+        $diff $tmpfile1 $STDOUT
+
+        [ ! -s $STDERR ]
 
     else
         # check that the captured stdout is empty
         [ ! -s $STDOUT ]
-  #      [ ! -s $STDERR ]
+        [ ! -s $STDERR ]
     fi
 
     set +e
@@ -306,38 +260,6 @@ check_file() {
 }
 
 ##
-# checks the result of a command
-#
-# If stdout is not specified, it is assumed to be empty
-# If stderr is not specified, it is assumed to be empty
-check_file_ignore() {
-
-    local exit_status=$?
-
-    # return stdout and stderr to standard streams
-    uncapture_output
-
-    # trace the command
-    firsthistoryentry
-
-    set -e
-
-    $diff $2 $1
-#    [ ! -s $STDERR ]
-
-    if [ $exit_status -ne 0 ]; then
-        exit 1
-    fi
-
-    set +e
-
-    # return to capturing stdout and stderr
-    capture_output
-
-    true
-}
-
-##
 # checks the exit status of a command
 #   $1 expected return value
 check_exit() {
@@ -358,14 +280,26 @@ check_exit() {
 
     set -e
 
+    # testfile pattern
+    line=$(caller | cut -d' ' -f1)
+    TEMPFILE=$PWD'/.test.'$line
+
     if [ $# -eq 2 ]; then
-        $diff <(echo -en "$2") $STDERR || $diff <(echo -en "$2") $STDERR
+        tmpfile2=$TEMPFILE.2
+        echo -en "$2" > $tmpfile2
+        $diff $tmpfile2 $STDERR
+
         [ ! -s $STDOUT ]
     fi
 
     if [ $# -eq 3 ]; then
-        $diff <(echo -en "$2") $STDOUT || $diff <(echo -en "$2") $STDOUT
-        $diff <(echo -en "$3") $STDERR || $diff <(echo -en "$3") $STDERR
+        tmpfile2=$TEMPFILE.2
+        echo -en "$2" > $tmpfile2
+        $diff $tmpfile2 $STDOUT
+
+        tmpfile3=$TEMPFILE.3
+        echo -en "$3" > $tmpfile3
+        $diff $tmpfile3 $STDERR
     fi
 
     set +e

@@ -1,41 +1,16 @@
- /**
+ // SPDX-License-Identifier: GPL-3.0-only
+/**
  * @file xpathTransformation.hpp
  *
  * @copyright Copyright (C) 2008-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML Toolkit.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #ifndef INCLUDED_XPATHTRANSFORMATION_HPP
 #define INCLUDED_XPATHTRANSFORMATION_HPP
 
-#if defined(__GNUG__) && !defined(__MINGW32__) && !defined(NO_DLLOAD)
-#define DLLOAD
-#else
-#undef DLLOAD
-#endif
-
 #include <libxml/parser.h>
-
-#include <srcmlns.hpp>
-
-#if defined(__GNUG__) && !defined(__MINGW32__) && !defined(NO_DLLOAD)
-#include <dlfcn.h>
-#endif
 
 #include <Transformation.hpp>
 #include <srcml_translator.hpp>
@@ -160,10 +135,6 @@ public:
 
 private:
     xmlXPathContextPtr createContext(xmlDocPtr doc) const;
-#ifdef DLLOAD
-    void* handle = nullptr;
-#endif
-
 };
 
 #endif

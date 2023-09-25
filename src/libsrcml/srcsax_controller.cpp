@@ -1,29 +1,16 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file srcsax_controller.cpp
  *
  * @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
- *
- * srcSAX is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * srcSAX is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
+
 #include <srcsax.hpp>
 #include <sax2_srcsax_handler.hpp>
 
 #include <libxml/parserInternals.h>
 
 #include <functional>
-#include <cstring>
 
 /**
  * libxml_error
@@ -59,9 +46,6 @@ srcsax_context* srcsax_create_context_parser_input_buffer(std::unique_ptr<xmlPar
 
     const char* encoding = nullptr;
 
-    xmlGenericErrorFunc error_handler = (xmlGenericErrorFunc) libxml_error;
-    initGenericErrorDefaultFunc(&error_handler);
-
     srcsax_context* context = nullptr;
     try {
         context = new srcsax_context();
@@ -76,6 +60,9 @@ srcsax_context* srcsax_create_context_parser_input_buffer(std::unique_ptr<xmlPar
         delete context;
         return 0;
     }
+
+    xmlGenericErrorFunc error_handler = (xmlGenericErrorFunc) libxml_error;
+    xmlSetGenericErrorFunc(libxml2_context, error_handler);
 
     context->libxml2_context = libxml2_context;
 
@@ -131,7 +118,7 @@ int srcsax_parse(srcsax_context* context) {
 
         xmlErrorPtr ep = xmlCtxtGetLastError(context->libxml2_context);
 
-        auto str_length = strlen(ep->message);
+        auto str_length = std::string_view(ep->message).size();
         ep->message[str_length - 1] = '\0';
 
         context->srcsax_error((const char *)ep->message, ep->code);

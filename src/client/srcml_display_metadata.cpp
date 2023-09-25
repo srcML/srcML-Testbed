@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file srcml_display_info.cpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <srcml_display_metadata.hpp>
@@ -28,12 +15,11 @@
 #include <srcml_options.hpp>
 #include <iostream>
 #include <iomanip>
-#include <cstring>
 #include <srcml_utilities.hpp>
 
 namespace {
 
-    const char* value(const char* call) {
+    std::string_view value(const char* call) {
         return call ? call : "";
     }
 
@@ -160,7 +146,7 @@ void srcml_display_metadata(const srcml_request_t& srcml_request, const srcml_in
         else if (contains<FILE*>(input)){
             status = srcml_archive_read_open_FILE(srcml_arch.get(), input);
         } else {
-            status = srcml_archive_read_open_filename(srcml_arch.get(), (src_prefix_resource(input).c_str()));
+            status = srcml_archive_read_open_filename(srcml_arch.get(), (src_prefix_resource(input).data()));
         }
         if (status != SRCML_STATUS_OK) {
             SRCMLstatus(ERROR_MSG, "srcml input cannot not be opened.");
@@ -228,7 +214,7 @@ void srcml_display_metadata(const srcml_request_t& srcml_request, const srcml_in
         }
 
         if (srcml_request.xmlns_prefix_query) {
-            const char* prefix = srcml_archive_get_prefix_from_uri(srcml_arch.get(), srcml_request.xmlns_prefix_query->c_str());
+            const char* prefix = srcml_archive_get_prefix_from_uri(srcml_arch.get(), srcml_request.xmlns_prefix_query->data());
             if (prefix) {
                 std::cout << prefix << '\n';
             }

@@ -1,26 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /*!
  * @file OperatorLexer.g
  *
  * @copyright Copyright (C) 2004-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML translator.
- *
- * The srcML translator is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML translator is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML translator; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 header {
+#ifndef _MSC_VER
+#else
+    #pragma warning(disable : 4456) // declaration of 'theRetToken' hides previous local declaration
+    #pragma warning(disable : 4242) // 'argument': conversion from 'int' to 'char'
+#endif
+
    #include <iostream>
 }
 
@@ -138,7 +131,7 @@ OPERATORS options { testLiterals = true; } {
     '>' (('>' '=') => '>' '=')? ('=')? |
 
     // <, << (C/C++), <=, <<< (CUDA)
-    '<' ('=' | '<' ({ inLanguage(LANGUAGE_CXX) | inLanguage(LANGUAGE_C) }? '<' | '=')? )? |
+    '<' ('=' | '<' ({ inLanguage(LANGUAGE_CXX) || inLanguage(LANGUAGE_C) }? '<' | '=')? )? |
 
     // match these as individual operators only
     ',' | ';' | '('..')' | '[' | ']' | '{' | '}' | 

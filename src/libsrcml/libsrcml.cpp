@@ -1,37 +1,18 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file libsrcml.cpp
  *
  * @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
  *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
-
-/*
-  Implementation of srcml simple API (global archive) functions from the namespace srcml_*
+ * Implementation of srcml simple API (global archive) functions from the namespace srcml_*
 */
 
 #include <srcml.h>
 #include <srcml_types.hpp>
-#include <srcml_macros.hpp>
 #include <srcml_sax2_utilities.hpp>
 
 #include <Language.hpp>
 #include <language_extension_registry.hpp>
-#include <srcmlns.hpp>
-
-#include <cstring>
 #include <stdlib.h>
 
 #include <vector>
@@ -39,10 +20,6 @@
 #include <fstream>
 
 #include <memory>
-
-#if defined(__GNUG__) && !defined(__MINGW32__) && !defined(NO_DLLOAD)
-#include <dlfcn.h>
-#endif
 
 // library constructor/destructor
 #if defined(__GNUC__)
@@ -214,25 +191,25 @@ int srcml(const char* input_filename, const char* output_filename) {
     } else {
 
         // check the extension for .xml or .srcml, non case-sensitive
-        size_t len = strlen(input_filename);
+        size_t len = std::string_view(input_filename).size();
         if (!((len > 4 && tolower(input_filename[len - 1]) == 'l' && tolower(input_filename[len - 2]) == 'm'
             && ((tolower(input_filename[len - 3]) == 'x' && input_filename[len - 4] == '.')
              || (tolower(input_filename[len - 3]) == 'c' && tolower(input_filename[len - 4]) == 'r' && tolower(input_filename[len - 5]) == 's' && tolower(input_filename[len - 6]) == '.')))
-           || (global_archive.language && strcmp(global_archive.language->c_str(), "xml") == 0))) {
+           || (global_archive.language && global_archive.language == "xml"sv))) {
 
             if (global_archive.language) {
-                global_archive.error_string = "Language '";
-                global_archive.error_string += global_archive.language->c_str();
-                global_archive.error_string += "' is not supported.";
+                global_archive.error_string = "Language '"sv;
+                global_archive.error_string += global_archive.language->data();
+                global_archive.error_string += "' is not supported."sv;
             } else
-                global_archive.error_string = "No language provided.";
+                global_archive.error_string = "No language provided."sv;
 
             return SRCML_STATUS_INVALID_INPUT;
         }
 
         std::unique_ptr<srcml_archive> archive(srcml_archive_clone(&global_archive));
         if (!archive) {
-            global_archive.error_string = "Unable to create srcML archive";
+            global_archive.error_string = "Unable to create srcML archive"sv;
             return SRCML_STATUS_ERROR;
         }
 
@@ -707,7 +684,7 @@ size_t srcml_get_srcdiff_revision() {
  *                                                                            *
  ******************************************************************************/
 
-static const char* langs[] = { "C", "C++", "C#", "Java", "Objective-C" };
+static std::string_view langs[] = { "C", "C++", "C#", "Java", "Objective-C" };
 
 /**
  * srcml_check_language
@@ -725,7 +702,7 @@ int srcml_check_language(const char* language) {
 
     // first find in public languages (ones in langs[], then get the number)
     for (size_t i = 0; i < srcml_get_language_list_size(); ++i)
-        if (strcmp(language, langs[i]) == 0)
+        if (language == langs[i])
             return Language::getLanguage(language);
 
     return 0;
@@ -754,9 +731,10 @@ size_t srcml_get_language_list_size() {
  */
 const char * srcml_get_language_list(size_t pos) {
 
-    if (pos >= srcml_get_language_list_size()) return NULL;
+    if (pos >= srcml_get_language_list_size())
+        return NULL;
 
-    return langs[pos];
+    return langs[pos].data();
 }
 
 /**
@@ -800,13 +778,6 @@ int srcml_check_encoding(const char* encoding) {
  * @returns Return 1 on success and 0 on failure.
  */
 int srcml_check_xslt() {
-#if defined(__GNUG__) && !defined(__MINGW32__) && !defined(NO_DLLOAD)
-    void* handle = dlopen_libxslt();
-    if (!handle)
-        return 0;
-
-    dlclose(handle);
-#endif
 
     return 1;
 }
@@ -818,13 +789,6 @@ int srcml_check_xslt() {
  * @returns Return 1 on success and 0 on failure.
  */
 int srcml_check_exslt() {
-#if defined(__GNUG__) && !defined(__MINGW32__) && !defined(NO_DLLOAD)
-    void* handle = dlopen_libexslt();
-    if (!handle)
-        return 0;
-
-    dlclose(handle);
-#endif
 
     return 1;
 }
@@ -840,7 +804,7 @@ int srcml_check_exslt() {
  *
  * @returns Return a string describing last recorded error for convenience functions.
  */
-const char* srcml_error_string() { return global_archive.error_string.c_str(); }
+const char* srcml_error_string() { return global_archive.error_string.data(); }
 
 /******************************************************************************
  *                                                                            *

@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file src_input_filelist.cpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <src_input_filelist.hpp>
@@ -27,7 +14,6 @@
 #include <create_srcml.hpp>
 #include <libarchive_utilities.hpp>
 #include <iostream>
-#include <cstring>
 #include <archive.h>
 #include <archive_entry.h>
 #include <SRCMLStatus.hpp>
@@ -35,10 +21,10 @@
 int src_input_filelist(ParseQueue& queue,
                         srcml_archive* srcml_arch,
                         const srcml_request_t& srcml_request,
-                        const std::string& input_file,
+                        std::string_view input_file,
                         const srcml_output_dest& destination) {
 
-    std::unique_ptr<archive> arch(libarchive_input_file(input_file));
+    std::unique_ptr<archive> arch(libarchive_input_file(srcml_input_src(input_file)));
     if (!arch)
         return -1;
 
@@ -56,7 +42,7 @@ int src_input_filelist(ParseQueue& queue,
     }
 
     if (status != ARCHIVE_OK) {
-        SRCMLstatus(ERROR_MSG, "srcml: Invalid filelist " + input_file);
+        SRCMLstatus(ERROR_MSG, "srcml: Invalid filelist " + std::string(input_file));
         return -1;
     }
 
@@ -70,7 +56,7 @@ int src_input_filelist(ParseQueue& queue,
     // if we know the size, create the right sized data_buffer
     std::vector<char> vbuffer;
     if (archive_entry_size_is_set(entry))
-        vbuffer.reserve(archive_entry_size(entry));
+        vbuffer.reserve(static_cast<std::size_t>(archive_entry_size(entry)));
 
     // read the file into a buffer
     const char* buffer;
@@ -89,7 +75,7 @@ int src_input_filelist(ParseQueue& queue,
             ++line;
         ++line;
 
-        std::string sline(startline, line - startline);
+        std::string sline(startline, static_cast<std::size_t>(line - startline));
 
         // trim from both ends
         const std::string WHITESPACE = " \n\r\t\f\v";
@@ -108,8 +94,8 @@ int src_input_filelist(ParseQueue& queue,
 
         // process this file
         srcml_input_src input(sline);
-        int status = srcml_handler_dispatch(queue, srcml_arch, srcml_request, input, destination);
-        if (status == -1)
+        auto fileStatus = srcml_handler_dispatch(queue, srcml_arch, srcml_request, input, destination);
+        if (fileStatus == -1)
             return -1;
     }
 

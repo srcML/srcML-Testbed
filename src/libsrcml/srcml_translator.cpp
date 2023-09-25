@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file srcml_translator.cpp
  *
@@ -5,33 +6,32 @@
  *
  * This file is part of the srcML Toolkit.
  *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
-
-/*
-  Class for straight forward translation from source code to srcML
+ * Class for straight forward translation from source code to srcML
 */
 
-#include "srcml_translator.hpp"
-#include "KeywordLexer.hpp"
-#include "srcMLParser.hpp"
-#include "StreamMLParser.hpp"
-#include "srcMLOutput.hpp"
-#include "srcmlns.hpp"
+#include <srcml_translator.hpp>
+#ifdef _MSC_VER
+// #   pragma warning(push, 0)
+#endif
+#undef CONST
+#undef VOID
+#undef DELETE
+#undef INTERFACE
+#undef OUT
+#undef IN
+#undef THIS
+#include <KeywordLexer.hpp>
+#include <srcMLParser.hpp>
+#include <StreamMLParser.hpp>
+#ifdef _MSC_VER
+// #   pragma warning(pop)
+#endif
+#include <srcmlns.hpp>
 #include <srcml_types.hpp>
 #include <unit_utilities.hpp>
+#include <srcMLOutput.hpp>
+
+using namespace ::std::literals::string_view_literals;
 
 /**
  * srcml_translator
@@ -57,7 +57,7 @@ srcml_translator::srcml_translator(xmlOutputBuffer * output_buffer,
                                  const char* xml_encoding,
                                  OPTION_TYPE& op,
                                  const Namespaces& namespaces,
-                                 boost::optional<std::pair<std::string, std::string> > processing_instruction,
+                                 std::optional<std::pair<std::string, std::string> > processing_instruction,
                                  size_t tabsize,
                                  int language,
                                  const char* revision,
@@ -212,26 +212,25 @@ bool srcml_translator::add_unit(const srcml_unit* unit) {
 
     // if a srcdiff revision, remove the srcdiff namespace
     if (unit->archive->revision_number) {
-        auto&& view = mergedns.get<nstags::uri>();
-        auto it = view.find(SRCML_DIFF_NS_URI);
-        if (it != view.end()) {
-            view.erase(it);
+        auto it = findNSURI(mergedns, SRCML_DIFF_NS_URI);
+        if (it != mergedns.end()) {
+            mergedns.erase(it);
         }
     }
 
-    std::string language = unit->language ? *unit->language : Language(unit->derived_language).getLanguageString();
+    std::string derivedLanguage = unit->language ? *unit->language : Language(unit->derived_language).getLanguageString();
 
     // create a new unit start tag with all new info (hash value, namespaces actually used, etc.)
     out.initNamespaces(mergedns);
     auto nrevision = unit->archive->revision_number;
-    out.startUnit(language.c_str(),
-            (options & SRCML_OPTION_ARCHIVE) && unit->revision ? unit->revision->c_str() : revision,
-            (options & SRCML_OPTION_ARCHIVE) || !unit->url       ? 0 : (nrevision ? attribute_revision(*unit->url, (int) *nrevision).c_str() : unit->url->c_str()),
-            !unit->filename  ? 0 : (nrevision ? attribute_revision(*unit->filename, (int) *nrevision).c_str() : unit->filename->c_str()),
-            !unit->version   ? 0 : (nrevision ? attribute_revision(*unit->version, (int) *nrevision).c_str() : unit->version->c_str()),
-            !unit->timestamp ? 0 : (nrevision ? attribute_revision(*unit->timestamp, (int) *nrevision).c_str() : unit->timestamp->c_str()),
-            !unit->hash      ? 0 : (nrevision ? attribute_revision(*unit->hash, (int) *nrevision).c_str() : unit->hash->c_str()),
-            !unit->encoding  ? 0 : (nrevision ? attribute_revision(*unit->encoding, (int) *nrevision).c_str() : unit->encoding->c_str()),
+    out.startUnit(derivedLanguage.data(),
+            (options & SRCML_OPTION_ARCHIVE) && unit->revision ? unit->revision->data() : revision,
+            (options & SRCML_OPTION_ARCHIVE) || !unit->url       ? 0 : (nrevision ? attribute_revision(*unit->url, (int) *nrevision).data() : unit->url->data()),
+            !unit->filename  ? 0 : (nrevision ? attribute_revision(*unit->filename, (int) *nrevision).data() : unit->filename->data()),
+            !unit->version   ? 0 : (nrevision ? attribute_revision(*unit->version, (int) *nrevision).data() : unit->version->data()),
+            !unit->timestamp ? 0 : (nrevision ? attribute_revision(*unit->timestamp, (int) *nrevision).data() : unit->timestamp->data()),
+            !unit->hash      ? 0 : (nrevision ? attribute_revision(*unit->hash, (int) *nrevision).data() : unit->hash->data()),
+            !unit->encoding  ? 0 : (nrevision ? attribute_revision(*unit->encoding, (int) *nrevision).data() : unit->encoding->data()),
             unit->attributes,
             false);
 
@@ -240,12 +239,12 @@ bool srcml_translator::add_unit(const srcml_unit* unit) {
 
     if (unit->archive->revision_number && issrcdiff(unit->archive->namespaces)) {
 
-        std::string s = extract_revision(unit->srcml.c_str() + unit->content_begin, size, (int) *unit->archive->revision_number);
+        std::string s = extract_revision(unit->srcml.data() + unit->content_begin, size, (int) *unit->archive->revision_number);
 
-        xmlTextWriterWriteRawLen(out.getWriter(), BAD_CAST s.c_str(), (int) s.size());
+        xmlTextWriterWriteRawLen(out.getWriter(), BAD_CAST s.data(), (int) s.size());
 
     } else if (size > 0) {
-        xmlTextWriterWriteRawLen(out.getWriter(), BAD_CAST (unit->srcml.c_str() + unit->content_begin), size);
+        xmlTextWriterWriteRawLen(out.getWriter(), BAD_CAST (unit->srcml.data() + unit->content_begin), size);
     }
 
     // end the unit
@@ -325,15 +324,22 @@ bool srcml_translator::add_start_element(const char* prefix, const char* name, c
     if (!is_outputting_unit || name == 0)
         return false;
 
-    if (strcmp(name, "unit") == 0)
+    if ("unit"sv == name)
         return false;
+
+    // if (strcmp(name, "unit") == 0)
+    //     return false;
 
     ++output_unit_depth;
 
     const char* used_uri = nullptr;
-    if (uri == nullptr || strcmp(SRCML_SRC_NS_URI, uri) != 0) {
+    if (uri == nullptr || "http://www.srcML.org/srcML/src"sv != uri) {
         used_uri = uri;
     }
+
+    // if (uri == nullptr || strcmp(SRCML_SRC_NS_URI, uri) != 0) {
+    //     used_uri = uri;
+    // }
 
     return xmlTextWriterStartElementNS(out.getWriter(), BAD_CAST prefix, BAD_CAST name, BAD_CAST used_uri) != -1;
 }
@@ -377,7 +383,7 @@ bool srcml_translator::add_namespace(const char* prefix, const char *uri) {
         name += prefix;
     }
 
-    return xmlTextWriterWriteAttribute(out.getWriter(), BAD_CAST name.c_str(), BAD_CAST uri) != -1;
+    return xmlTextWriterWriteAttribute(out.getWriter(), BAD_CAST name.data(), BAD_CAST uri) != -1;
 }
 
 /**

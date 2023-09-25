@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /*!
  * @file TextLexer.g
  *
  * @copyright Copyright (C) 2002-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML translator.
- *
- * The srcML translator is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML translator is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML translator; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  * An antlr Lexer that passes tokens consisting of either
  * whitespace or non-whitespace.  Non-whitespace is output
@@ -28,6 +15,13 @@
  * Identifies keywords in the stream.  Non-keywords and other text,
  * including whitespace, is passed through unused.
  */
+
+header {
+#ifndef _MSC_VER
+#else
+    #pragma warning(disable : 4242) // 'argument': conversion from 'int' to 'char'
+#endif
+}
 
 options {
     language="Cpp";
@@ -97,7 +91,7 @@ RAW_STRING_START :
 protected
 RSTRING_DELIMITER:
     { delimiter = ""; }
-    (options { greedy = true; } : { delimiter += LA(1); } ~('(' | ')' | '\\' | '\n' | ' ' | '\t' ))*
+    (options { greedy = true; } : { delimiter += static_cast<char>(LA(1)); } ~('(' | ')' | '\\' | '\n' | ' ' | '\t' ))*
 ;
 
 CHAR_START :
@@ -117,7 +111,7 @@ CONSTANTS :
     {
         //firstpreprocline = false;
         if (onpreprocline && isline) {
-            line_number = atoi(text.substr(_begin, text.length()-_begin).c_str()); 
+            line_number = atoi(text.substr(_begin, text.length()-_begin).data());
         }
     }
 ;
@@ -127,10 +121,10 @@ NAME options { testLiterals = true; } :
     ('a'..'z' | 'A'..'Z' | '_' | '\200'..'\377' | '$')
     ((options { greedy = true; } : '0'..'9' | 'a'..'z' | 'A'..'Z' | '_' | '\200'..'\377' | '$')*)
     (
-        { text == "L" || text == "U" || text == "u" || text == "u8" }?
+        { text == "L"sv || text == "U"sv || text == "u"sv || text == "u8"sv }?
         { $setType(STRING_START); } STRING_START |
 
-        { inLanguage(LANGUAGE_CXX) && (text == "R" || text == "u8R" || text == "LR" || text == "UR" || text == "uR") }?
+        { inLanguage(LANGUAGE_CXX) && (text == "R"sv || text == "u8R"sv || text == "LR"sv || text == "UR"sv || text == "uR"sv) }?
         { $setType(STRING_START); } RAW_STRING_START
     )?
 ;

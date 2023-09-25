@@ -1,34 +1,18 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file src_output_libarchive.cpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <src_output_libarchive.hpp>
 #include <srcml.h>
 #include <archive.h>
 #include <archive_entry.h>
-#include <stdlib.h>
-#include <cstdio>
 #include <string>
 #include <SRCMLStatus.hpp>
-#include <memory>
 #include <libarchive_utilities.hpp>
 #include <srcml_utilities.hpp>
 
@@ -62,8 +46,12 @@ void src_output_libarchive(srcml_archive* srcml_arch, archive* src_archive) {
         std::unique_ptr<char> pbuffer(buffer);
 
         // setup the entry
-        archive_entry_set_pathname(entry.get(), newfilename.c_str());
-        archive_entry_set_size(entry.get(), buffer_size);
+        archive_entry_set_pathname(entry.get(), newfilename.data());
+        if (buffer_size > INT_MAX) {
+            SRCMLstatus(ERROR_MSG, "Internal error and unable to save " + newfilename + " to source archive");
+            break;
+        }
+        archive_entry_set_size(entry.get(), static_cast<int>(buffer_size));
         archive_entry_set_filetype(entry.get(), AE_IFREG);
         archive_entry_set_perm(entry.get(), 0644);
 

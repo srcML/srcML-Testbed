@@ -1,27 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file test_srcml_archive_read_unit.cpp
  *
  * @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
  *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ * Test cases for srcml_archive_read_unit()
  */
-
-/*
-
-  Test cases for srcml_archive_read_unit
-*/
 
 #include <srcml.h>
 
@@ -305,6 +290,56 @@ int main(int, char* argv[]) {
         srcml_unit_free(unit);
         srcml_archive_close(archive);
         srcml_archive_free(archive);
+    }
+
+    {
+        srcml_archive* archive1 = srcml_archive_create();
+        srcml_archive_read_open_memory(archive1, srcml_two.c_str(), srcml_two.size());
+        srcml_unit* unit = srcml_archive_read_unit(archive1);
+        dassert(srcml_unit_get_language(unit), std::string("C"));
+        dassert(srcml_unit_get_filename(unit), std::string("project.c"));
+        dassert(srcml_archive_get_url(archive1), 0);
+        dassert(srcml_unit_get_version(unit), 0);
+        dassert(srcml_unit_get_srcml_inner(unit), std::string("<expr_stmt><expr><name>a</name></expr>;</expr_stmt>\n"));
+        srcml_unit_free(unit);
+
+        srcml_archive* archive2 = srcml_archive_create();
+        srcml_archive_read_open_memory(archive2, srcml_two.c_str(), srcml_two.size());
+        unit = srcml_archive_read_unit(archive2);
+        dassert(srcml_unit_get_language(unit), std::string("C"));
+        dassert(srcml_unit_get_filename(unit), std::string("project.c"));
+        dassert(srcml_archive_get_url(archive2), 0);
+        dassert(srcml_unit_get_version(unit), 0);
+        dassert(srcml_unit_get_srcml_inner(unit), std::string("<expr_stmt><expr><name>a</name></expr>;</expr_stmt>\n"));
+        srcml_unit_free(unit);
+
+        unit = srcml_archive_read_unit(archive1);
+        dassert(srcml_unit_get_language(unit), std::string("C"));
+        dassert(srcml_unit_get_filename(unit), std::string("project.c"));
+        dassert(srcml_archive_get_url(archive1), 0);
+        dassert(srcml_unit_get_version(unit), 0);
+        dassert(srcml_unit_get_srcml_inner(unit), std::string("<expr_stmt><expr><name>b</name></expr>;</expr_stmt>\n"));
+        srcml_unit_free(unit);
+
+        unit = srcml_archive_read_unit(archive2);
+        dassert(srcml_unit_get_language(unit), std::string("C"));
+        dassert(srcml_unit_get_filename(unit), std::string("project.c"));
+        dassert(srcml_archive_get_url(archive2), 0);
+        dassert(srcml_unit_get_version(unit), 0);
+        dassert(srcml_unit_get_srcml_inner(unit), std::string("<expr_stmt><expr><name>b</name></expr>;</expr_stmt>\n"));
+        srcml_unit_free(unit);
+
+        unit = srcml_archive_read_unit(archive2);
+        dassert(unit, 0);
+
+        unit = srcml_archive_read_unit(archive1);
+        dassert(unit, 0);
+
+        srcml_unit_free(unit);
+        srcml_archive_close(archive1);
+        srcml_archive_free(archive1);
+        srcml_archive_close(archive2);
+        srcml_archive_free(archive2);
     }
 
     {

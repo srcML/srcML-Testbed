@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file src_input_filesystem.cpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 /*
@@ -28,28 +15,30 @@
 #include <src_input_filesystem.hpp>
 #include <srcml_input_srcml.hpp>
 
+#include <string_view>
 #include <list>
 #include <deque>
 #include <vector>
-#include <memory>
 #include <archive.h>
 #include <archive_entry.h>
 
 #include <stdio.h>
-#ifdef _MSC_BUILD
+#ifdef _MSC_VER
     #include <direct.h>
 #else
     #include <unistd.h>
 #endif
 
+using namespace ::std::literals::string_view_literals;
+
 int src_input_filesystem(ParseQueue& queue,
                           srcml_archive* srcml_arch,
                           const srcml_request_t& srcml_request,
-                          const std::string& raw_input) {
+                          std::string_view raw_input) {
 
     // with immediate directory "." lookup the current working directory
-    std::string input = raw_input;
-    if (input == ".") {
+    std::string_view input = raw_input;
+    if (input == "."sv) {
         char* cwd(getcwd(nullptr, 0));
         input = cwd;
         free(cwd);
@@ -65,7 +54,7 @@ int src_input_filesystem(ParseQueue& queue,
 #elif ARCHIVE_VERSION_NUMBER >= 3002000
     archive_read_disk_set_behavior(darchive, ARCHIVE_READDISK_NO_XATTR);
 #endif
-    archive_read_disk_open(darchive, input.c_str());
+    archive_read_disk_open(darchive, input.data());
 
     /* Null entry with archive_read_next_header() causes a segfault on ARCHIVE_VERSION_NUMBER < 300200
        Creating an entry and using archive_read_next_header2() works */

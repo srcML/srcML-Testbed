@@ -1,30 +1,17 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file ModeStack.hpp
  *
  * @copyright Copyright (C) 2004-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML Toolkit.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #ifndef MODE_STACK_HPP
 #define MODE_STACK_HPP
 
-#include "TokenParser.hpp"
-#include "srcMLState.hpp"
+#include <TokenParser.hpp>
+#include <srcMLState.hpp>
 
 /**
  * ModeStack
@@ -36,7 +23,7 @@ class ModeStack : public TokenParser {
 
 public:
 
-    #include "Mode.hpp"
+    #include <Mode.hpp>
 
    /**
      * ModeStack
@@ -125,7 +112,7 @@ protected:
      * Delegate to remove the current mode m (pop from stack).
      * Does not actually check or use m.
      */
-    void endMode(const srcMLState::MODE_TYPE& m) {
+    void endMode(const srcMLState::MODE_TYPE& /* m */) {
 
         if (st.size() <= 1)
             throw Segmentation_Fault();

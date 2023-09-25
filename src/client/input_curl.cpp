@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file input_curl.hpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <srcml_pipe.hpp>
@@ -27,11 +14,14 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <limits.h>
+#include <string>
+#include <string_view>
 
-bool curl_supported(const std::string& input_protocol) {
+bool curl_supported(std::string_view input_protocol) {
     const char* const* curl_types = curl_version_info(CURLVERSION_NOW)->protocols;
     for (int i = 0; curl_types[i] != nullptr; ++i) {
-        if (std::string(curl_types[i]) == input_protocol)
+        if (curl_types[i] == input_protocol)
             return true;
     }
     return false;
@@ -77,26 +67,30 @@ bool getCurlErrors() {
     Write callback for curl. libcurl internals use fwrite() as default, so replacing it
     with our own callback does not entail an additional copy
 */
-size_t our_curl_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+extern "C" {
+    size_t our_curl_write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
 
-    curl_write_info* data = (curl_write_info*) userdata;
+        curl_write_info* data = (curl_write_info*) userdata;
 
-    // have to check for download errors before we write anything into the pipe
-    // you may expect that if there were errors, you could check for that before data
-    // is written. But that is not the case
-    long http_code = 0;
-    curl_easy_getinfo (data->curlhandle, CURLINFO_RESPONSE_CODE, &http_code);
+        // have to check for download errors before we write anything into the pipe
+        // you may expect that if there were errors, you could check for that before data
+        // is written. But that is not the case
+        long http_code = 0;
+        curl_easy_getinfo (data->curlhandle, CURLINFO_RESPONSE_CODE, &http_code);
 
-    // return immediately with an error so that curl_easy_perform() returns
-    // and curl_easy_getinfo() can get data to process the error
-    if (http_code != 200)
-        return 0;
+        // return immediately with an error so that curl_easy_perform() returns
+        // and curl_easy_getinfo() can get data to process the error
+        if (http_code != 200)
+            return 0;
 
-    goCurl(true);
+        goCurl(true);
 
-    ssize_t result = write(data->outfd, ptr, size * nmemb);
+        if (size * nmemb > UINT_MAX)
+            return 0;
+        ssize_t result = write(data->outfd, ptr, static_cast<unsigned int>(size * nmemb));
 
-    return result == -1 ? 0 : (size_t) result;
+        return result == -1 ? 0 : (size_t) result;
+    }
 }
 
 // downloads URL into file descriptor
@@ -126,7 +120,7 @@ int input_curl(srcml_input_src& input) {
         curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &write_info);
         curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, our_curl_write_callback);
 
-        curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl_handle, CURLOPT_URL, url.data());
         curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
 
         curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, 1L);

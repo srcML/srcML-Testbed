@@ -1,27 +1,17 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file language_extension_registry.cpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML Toolkit.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <language_extension_registry.hpp>
 #include <algorithm>
+#include <string_view>
+
+using namespace ::std::literals::string_view_literals;
 
 /**
 * language_extension_registry
@@ -75,7 +65,7 @@ bool get_language_extension(const char * const inpath, std::string & extension)
 
     // remove any .gz extension
     // FIXME: Why are we doing this? Could be many types of these kind of extensions
-    if ((path.size() > 3) && (path.substr(path.size() - 3) == ".gz"))
+    if ((path.size() > 3) && (path.substr(path.size() - 3) == ".gz"sv))
         path.resize(path.size() - 3);
 
     // get the proper extension, not including the '.'
@@ -145,10 +135,16 @@ int language_extension_registry::get_language_from_filename(const char* const pa
         return 0;
 
     // custom extensions
-    for (int i = (int)(registered_languages.size() - 1); i >= 0; --i) {
-        if (get_extension(registered_languages[i]) == extension)
-            return get_language(registered_languages[i]) == Language::LANGUAGE_NONE ? 0 :
-                get_language(registered_languages[i]) == Language::LANGUAGE_C && use_cpp_for_c ? Language::LANGUAGE_CXX : get_language(registered_languages[i]);
+    // search from the back
+    auto result = std::find_if(registered_languages.rbegin(), registered_languages.rend(), [extension](const language_extension& le){ return le.first == extension; });
+    if (result != registered_languages.rend()) {
+            if (result->second == Language::LANGUAGE_NONE)
+                return 0;
+
+            if (result->second == Language::LANGUAGE_C && use_cpp_for_c)
+                return Language::LANGUAGE_CXX;
+
+            return result->second;
     }
 
     return 0;

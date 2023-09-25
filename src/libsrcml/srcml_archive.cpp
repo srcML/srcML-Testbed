@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file srcml_archive.cpp
  *
  * @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <srcml.h>
@@ -41,8 +28,8 @@ const char* srcml_archive_check_extension(const srcml_archive* archive, const ch
         return 0;
 
     Language language(archive->registered_languages.get_language_from_filename(filename));
-    const char* lang_string = language.getLanguageString();
-    return strcmp(lang_string, "") == 0 ? 0 : lang_string;
+    std::string_view lang_string = language.getLanguageString();
+    return lang_string.empty() ? 0 : lang_string.data();
 }
 
 /******************************************************************************
@@ -61,7 +48,7 @@ const char* srcml_archive_check_extension(const srcml_archive* archive, const ch
  */
 srcml_archive* srcml_archive_create() {
 
-    srcml_archive* archive;
+    srcml_archive* archive = nullptr;
     try {
 
         archive = new srcml_archive;
@@ -94,7 +81,7 @@ const char* srcml_archive_error_string(const struct srcml_archive* archive) {
     if (archive == nullptr)
         return "Archive does not exist";
 
-    return archive->error_string.c_str();
+    return archive->error_string.data();
 }
 
 /**
@@ -186,7 +173,10 @@ int srcml_archive_set_src_encoding(struct srcml_archive* archive, const char* sr
     if (archive == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    archive->src_encoding = src_encoding ? std::string(src_encoding) : boost::optional<std::string>();
+    if (src_encoding)
+        archive->src_encoding = src_encoding;
+    else
+        archive->src_encoding = decltype(archive->src_encoding)();
 
     return SRCML_STATUS_OK;
 }
@@ -205,7 +195,10 @@ int srcml_archive_set_xml_encoding(struct srcml_archive* archive, const char* en
     if (archive == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    archive->encoding = encoding ? std::string(encoding) : boost::optional<std::string>();
+    if (encoding)
+        archive->encoding = encoding;
+    else
+        archive->encoding = decltype(archive->encoding)();
 
     return SRCML_STATUS_OK;
 }
@@ -224,7 +217,10 @@ int srcml_archive_set_language(struct srcml_archive* archive, const char* langua
     if (archive == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    archive->language = language ? std::string(language) : decltype(archive->language)();
+    if (language)
+        archive->language = language;
+    else
+        archive->language = decltype(archive->language)();
 
     return SRCML_STATUS_OK;
 }
@@ -243,7 +239,10 @@ int srcml_archive_set_url (struct srcml_archive* archive, const char* url) {
     if (archive == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    archive->url = url ? std::string(url) : decltype(archive->url)();
+    if (url)
+        archive->url = url;
+    else
+        archive->url = decltype(archive->url)();
 
     return SRCML_STATUS_OK;
 }
@@ -265,7 +264,7 @@ int srcml_archive_set_version(struct srcml_archive* archive, const char* version
     if (version)
         archive->version = version;
     else
-        archive->version = boost::none;
+        archive->version = std::nullopt;
 
     return SRCML_STATUS_OK;
 }
@@ -289,7 +288,7 @@ int srcml_archive_set_options(struct srcml_archive* archive, size_t options) {
         archive->options |= SRCML_OPTION_CPP_DECLARED;
     }
 
-    int modoption = options % (1<<7);
+    OPTION_TYPE modoption = options % (1<<7);
 
     archive->options = modoption;
 
@@ -383,7 +382,7 @@ int srcml_archive_enable_option(struct srcml_archive* archive, size_t option) {
         archive->options |= SRCML_OPTION_CPP_DECLARED;
     }
 
-    int modoption = option % (1<<7);
+    OPTION_TYPE modoption = option % (1<<7);
 
     archive->options |= modoption;
 
@@ -405,7 +404,7 @@ int srcml_archive_disable_option(struct srcml_archive* archive, size_t option) {
     if (archive == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    int modoption = option % (1<<7);
+    OPTION_TYPE modoption = option % (1<<7);
 
     archive->options &= ~modoption;
 
@@ -468,24 +467,27 @@ int srcml_archive_register_namespace(struct srcml_archive* archive, const char* 
         return SRCML_STATUS_INVALID_ARGUMENT;
 
     // lookup by uri, if it already exists, update the prefix. If it doesn't exist, add it
-    auto& view = archive->namespaces.get<nstags::uri>();
-    auto it = view.find(uri);
-    if (it != view.end()) {
-        // change prefix of existing namespace
-        view.modify(it, [prefix](Namespace& ns) { ns.prefix = prefix; });
+    // prefix must be unique
+    auto ituri = findNSURI(archive->namespaces, uri);
+    auto itprefix = findNSPrefix(archive->namespaces, prefix);
+    if (ituri != archive->namespaces.end() && itprefix != archive->namespaces.end()) {
+        // existing prefix/uri, change prefix of existing namespace
+        ituri->prefix = prefix;
+    } else if (ituri != archive->namespaces.end()) {
+        // change prefix for existing uri
+        ituri->prefix = prefix;
     } else {
         // add new namespace
-        archive->namespaces.push_back({ prefix, uri, NS_REGISTERED });
+        archive->namespaces.emplace_back(prefix, uri, NS_REGISTERED);
     }
 
     // namespaces for options enable the options automatically
-    std::string suri = uri;
-    if (suri == SRCML_CPP_NS_URI) {
+    if (uri == SRCML_CPP_NS_URI) {
         archive->options |= SRCML_OPTION_CPP;
         archive->options |= SRCML_OPTION_CPP_DECLARED;
-    } else if (suri == SRCML_ERROR_NS_URI) {
+    } else if (uri == SRCML_ERROR_NS_URI) {
         archive->options |= SRCML_OPTION_DEBUG;
-    } else if (suri == SRCML_POSITION_NS_URI) {
+    } else if (uri == SRCML_POSITION_NS_URI) {
         archive->options |= SRCML_OPTION_POSITION;
     }
 
@@ -587,7 +589,7 @@ int srcml_archive_set_srcdiff_revision(struct srcml_archive* archive, size_t rev
  */
 const char* srcml_archive_get_src_encoding(const struct srcml_archive* archive) {
 
-    return archive && archive->src_encoding ? archive->src_encoding->c_str() : 0;
+    return archive && archive->src_encoding ? archive->src_encoding->data() : 0;
 }
 
 /**
@@ -598,7 +600,7 @@ const char* srcml_archive_get_src_encoding(const struct srcml_archive* archive) 
  */
 const char* srcml_archive_get_xml_encoding(const struct srcml_archive* archive) {
 
-    return archive && archive->encoding ? archive->encoding->c_str() : 0;
+    return archive && archive->encoding ? archive->encoding->data() : 0;
 }
 
 /**
@@ -609,7 +611,7 @@ const char* srcml_archive_get_xml_encoding(const struct srcml_archive* archive) 
  */
 const char* srcml_archive_get_revision(const struct srcml_archive* archive) {
 
-    return archive && archive->revision ? archive->revision->c_str() : 0;
+    return archive && archive->revision ? archive->revision->data() : 0;
 }
 
 /**
@@ -620,7 +622,7 @@ const char* srcml_archive_get_revision(const struct srcml_archive* archive) {
  */
 const char* srcml_archive_get_language(const struct srcml_archive* archive) {
 
-    return archive && archive->language ? archive->language->c_str() : 0;
+    return archive && archive->language ? archive->language->data() : 0;
 }
 
 /**
@@ -631,7 +633,7 @@ const char* srcml_archive_get_language(const struct srcml_archive* archive) {
  */
 const char* srcml_archive_get_url(const struct srcml_archive* archive) {
 
-    return archive && archive->url ? archive->url->c_str() : 0;
+    return archive && archive->url ? archive->url->data() : 0;
 }
 
 /**
@@ -642,7 +644,7 @@ const char* srcml_archive_get_url(const struct srcml_archive* archive) {
  */
 const char* srcml_archive_get_version(const struct srcml_archive* archive) {
 
-    return archive && archive->version ? archive->version->c_str() : 0;
+    return archive && archive->version ? archive->version->data() : 0;
 }
 
 /**
@@ -654,7 +656,7 @@ const char* srcml_archive_get_version(const struct srcml_archive* archive) {
  */
 int srcml_archive_get_options(const struct srcml_archive* archive) {
 
-    return archive ? (archive->options % (1<<7)) : 0;
+    return archive ? static_cast<int>(archive->options % (1<<7)) : 0;
 }
 
 /**
@@ -695,7 +697,7 @@ const char* srcml_archive_get_namespace_prefix(const struct srcml_archive* archi
     if (pos > archive->namespaces.size())
         return nullptr;
 
-    return archive->namespaces[pos].prefix.c_str();
+    return archive->namespaces[pos].prefix.data();
 }
 
 /**
@@ -711,10 +713,8 @@ const char* srcml_archive_get_prefix_from_uri(const struct srcml_archive* archiv
     if (archive == nullptr || uri == nullptr)
         return 0;
 
-    const auto& view = archive->namespaces.get<nstags::uri>();
-    const auto it = view.find(uri);
-
-    return it != view.end() ? it->prefix.c_str() : 0;
+    auto it = findNSURI(archive->namespaces, uri);
+    return it != archive->namespaces.end() ? it->prefix.data() : 0;
 }
 
 /**
@@ -733,7 +733,7 @@ const char* srcml_archive_get_namespace_uri(const struct srcml_archive* archive,
     if (pos >= archive->namespaces.size())
         return nullptr;
 
-    return archive->namespaces[pos].uri.c_str();
+    return archive->namespaces[pos].uri.data();
 }
 
 /**
@@ -749,10 +749,8 @@ const char* srcml_archive_get_uri_from_prefix(const struct srcml_archive* archiv
     if (archive == nullptr || prefix == nullptr)
         return 0;
 
-    const auto& view = archive->namespaces.get<nstags::prefix>();
-    const auto& it = view.find(prefix);
-
-    return it != view.end() ? it->uri.c_str() : 0;
+    auto it = findNSPrefix(archive->namespaces, prefix);
+    return it != archive->namespaces.end() ? it->uri.data() : 0;
 }
 
 /**
@@ -763,7 +761,7 @@ const char* srcml_archive_get_uri_from_prefix(const struct srcml_archive* archiv
  */
 const char* srcml_archive_get_processing_instruction_target(const struct srcml_archive* archive) {
 
-    return archive->processing_instruction ? archive->processing_instruction->first.c_str() : 0;
+    return archive->processing_instruction ? archive->processing_instruction->first.data() : 0;
 }
 
 /**
@@ -774,7 +772,7 @@ const char* srcml_archive_get_processing_instruction_target(const struct srcml_a
  */
 const char* srcml_archive_get_processing_instruction_data(const struct srcml_archive* archive) {
 
-    return archive->processing_instruction ?  archive->processing_instruction->second.c_str() : 0;
+    return archive->processing_instruction ?  archive->processing_instruction->second.data() : 0;
 }
 
 /**
@@ -804,7 +802,7 @@ const char* srcml_archive_get_macro_token(const struct srcml_archive* archive, s
     if (pos * 2 >= archive->user_macro_list.size())
         return 0;
 
-    return archive->user_macro_list[pos * 2].c_str();
+    return archive->user_macro_list[pos * 2].data();
 }
 
 /**
@@ -825,7 +823,7 @@ const char* srcml_archive_get_macro_token_type(const struct srcml_archive* archi
         std::vector<std::string>::size_type user_macro_list_size = archive->user_macro_list.size() / 2;
         for(std::vector<std::string>::size_type i = 0;  user_macro_list_size; ++i)
             if (archive->user_macro_list.at(i * 2) == token)
-                return archive->user_macro_list.at(i * 2 + 1).c_str();
+                return archive->user_macro_list.at(i * 2 + 1).data();
 
     } catch(...) {}
 
@@ -848,7 +846,7 @@ const char* srcml_archive_get_macro_type(const struct srcml_archive* archive, si
     if (pos * 2 + 1 >= archive->user_macro_list.size())
         return 0;
 
-    return archive->user_macro_list[pos * 2 + 1].c_str();
+    return archive->user_macro_list[pos * 2 + 1].data();
 }
 
 /**
@@ -968,7 +966,7 @@ int srcml_archive_write_open_FILE(struct srcml_archive* archive, FILE* srcml_fil
 
     archive->type = SRCML_ARCHIVE_WRITE;
 
-    archive->output_buffer = xmlOutputBufferCreateFile(srcml_file, xmlFindCharEncodingHandler(archive->encoding ? archive->encoding->c_str() : 0));
+    archive->output_buffer = xmlOutputBufferCreateFile(srcml_file, xmlFindCharEncodingHandler(archive->encoding ? archive->encoding->data() : 0));
 
     return SRCML_STATUS_OK;
 }
@@ -990,7 +988,7 @@ int srcml_archive_write_open_fd(struct srcml_archive* archive, int srcml_fd) {
 
     archive->type = SRCML_ARCHIVE_WRITE;
 
-    archive->output_buffer = xmlOutputBufferCreateFd(srcml_fd, xmlFindCharEncodingHandler(archive->encoding ? archive->encoding->c_str() : 0));
+    archive->output_buffer = xmlOutputBufferCreateFd(srcml_fd, xmlFindCharEncodingHandler(archive->encoding ? archive->encoding->data() : 0));
 
     return SRCML_STATUS_OK;
 }
@@ -1015,7 +1013,7 @@ int srcml_archive_write_open_io(struct srcml_archive* archive, void * context, i
 
     archive->type = SRCML_ARCHIVE_WRITE;
 
-    archive->output_buffer = xmlOutputBufferCreateIO(write_callback, close_callback, context, xmlFindCharEncodingHandler(archive->encoding ? archive->encoding->c_str() : 0));
+    archive->output_buffer = xmlOutputBufferCreateIO(write_callback, close_callback, context, xmlFindCharEncodingHandler(archive->encoding ? archive->encoding->data() : 0));
 
     return SRCML_STATUS_OK;
 }
@@ -1068,7 +1066,7 @@ int srcml_archive_read_open_filename(struct srcml_archive* archive, const char* 
     if (archive == nullptr || srcml_filename == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateFilename(srcml_filename, archive->encoding ? xmlParseCharEncoding(archive->encoding->c_str()) : XML_CHAR_ENCODING_NONE));
+    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateFilename(srcml_filename, archive->encoding ? xmlParseCharEncoding(archive->encoding->data()) : XML_CHAR_ENCODING_NONE));
 
     return srcml_archive_read_open_internal(archive, std::move(input));
 }
@@ -1089,7 +1087,7 @@ int srcml_archive_read_open_memory(struct srcml_archive* archive, const char* bu
     if (archive == nullptr || buffer == nullptr || buffer_size <= 0)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    xmlCharEncoding encoding = archive->encoding ? xmlParseCharEncoding(archive->encoding->c_str()) : XML_CHAR_ENCODING_NONE;
+    xmlCharEncoding encoding = archive->encoding ? xmlParseCharEncoding(archive->encoding->data()) : XML_CHAR_ENCODING_NONE;
     std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateMem(buffer, (int)buffer_size, encoding));
 
     // buffer stuff
@@ -1132,7 +1130,7 @@ int srcml_archive_read_open_FILE(struct srcml_archive* archive, FILE* srcml_file
     if (archive == nullptr || srcml_file == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateFile(srcml_file, archive->encoding ? xmlParseCharEncoding(archive->encoding->c_str()) : XML_CHAR_ENCODING_NONE));
+    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateFile(srcml_file, archive->encoding ? xmlParseCharEncoding(archive->encoding->data()) : XML_CHAR_ENCODING_NONE));
 
     return srcml_archive_read_open_internal(archive, std::move(input));
 }
@@ -1152,7 +1150,7 @@ int srcml_archive_read_open_fd(struct srcml_archive* archive, int srcml_fd) {
     if (archive == nullptr || srcml_fd < 0)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateFd(srcml_fd, archive->encoding ? xmlParseCharEncoding(archive->encoding->c_str()) : XML_CHAR_ENCODING_NONE));
+    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateFd(srcml_fd, archive->encoding ? xmlParseCharEncoding(archive->encoding->data()) : XML_CHAR_ENCODING_NONE));
 
     return srcml_archive_read_open_internal(archive, std::move(input));
 }
@@ -1174,7 +1172,7 @@ int srcml_archive_read_open_io(struct srcml_archive* archive, void * context, in
     if (archive == nullptr || context == nullptr || read_callback == nullptr)
         return SRCML_STATUS_INVALID_ARGUMENT;
 
-    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateIO(read_callback, close_callback, context, archive->encoding ? xmlParseCharEncoding(archive->encoding->c_str()) : XML_CHAR_ENCODING_NONE));
+    std::unique_ptr<xmlParserInputBuffer> input(xmlParserInputBufferCreateIO(read_callback, close_callback, context, archive->encoding ? xmlParseCharEncoding(archive->encoding->data()) : XML_CHAR_ENCODING_NONE));
 
     return srcml_archive_read_open_internal(archive, std::move(input));
 }

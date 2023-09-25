@@ -1,27 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /*!
  * @file srcMLParser.g
  * 
  * @copyright Copyright (C) 2004-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcML translator.
- *
- * The srcML translator is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML translator is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML translator; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
-
-/*!
- * Comments:
  *
  * This is an ANTLR grammar file for the main part of the srcML translator.
  * It is a mixture of ANTLR code with C++ code mixed in for the actions.
@@ -116,27 +99,39 @@
  * the input if in C++ mode.  They are matched as NAME in C mode.
  */
 
-header "pre_include_hpp" {
-    #pragma GCC diagnostic ignored "-Wunknown-pragmas"
-    #pragma GCC diagnostic ignored "-Wunknown-warning-option"
-    #pragma GCC diagnostic ignored "-Wunused-parameter"
-    #pragma GCC diagnostic ignored "-Wcatch-value"
+header "pre_include_cpp" {
+#if defined(__GNUC__)
+#endif
+#ifdef __clang__
+#endif
+#if defined(__GNUC__) && !defined(__clang__)
+#endif
+#ifdef _MSC_VER
+    #pragma warning(disable : 4365)  // 'argument': conversion from 'int' to 'unsigned int', signed/unsigned mismatch
+    #pragma warning(disable : 4100)  // 'pe' unreferenced local variable
+    #pragma warning(disable : 4101)  // 'pe' unreferenced local variable
+#endif
 }
 
 // Included in the generated srcMLParser.hpp file after antlr includes
 header "post_include_hpp" {
-
-#pragma GCC diagnostic warning "-Wunused-parameter"
-
 #include <string>
+#include <string_view>
 #include <deque>
 #include <array>
 #include <stack>
-#include "Language.hpp"
-#include "ModeStack.hpp"
-#include <srcml_types.hpp>
-#include <srcml_macros.hpp>
-#include <srcml.h>
+#include <Language.hpp>
+#include <ModeStack.hpp>
+#include <srcml_options.hpp>
+#undef CONST
+#undef VOID
+#undef DELETE
+#undef INTERFACE
+#undef OUT
+#undef IN
+#undef THIS
+
+using namespace ::std::literals::string_view_literals;
 
 //#define DEBUG_PARSER
 
@@ -147,11 +142,11 @@ public:
     RuleTrace(int guessing, int token, int rd, std::string text, const char* fun, int line) :
         guessing(guessing), token(token), rd(rd), text(text), fun(fun), line(line) {
 
-        fprintf(stderr, "TRACE: %d %d %d %5s%*s %s (%d)\n", guessing, token, rd, text.c_str(), rd, "", fun, line);
+        fprintf(stderr, "TRACE: %d %d %d %5s%*s %s (%d)\n", guessing, token, rd, text.data(), rd, "", fun, line);
     }
 
     ~RuleTrace() {
-        fprintf(stderr, "  END: %d %d %d %5s%*s %s (%d)\n", guessing, token, rd, text.c_str(), rd, "", fun, line);
+        fprintf(stderr, "  END: %d %d %d %5s%*s %s (%d)\n", guessing, token, rd, text.data(), rd, "", fun, line);
     }
 private:
     int guessing;
@@ -779,15 +774,11 @@ public:
 
     virtual void consume() {
 
-        if (!skip_tokens_set.member(LA(1))) last_consumed = LA(1);
+        if (!skip_tokens_set.member((unsigned int) LA(1)))
+            last_consumed = LA(1);
         LLkParser::consume();
-
-
-
     }
-
 }
-
 
 /*
   start
@@ -1072,7 +1063,7 @@ pattern_statements[] { int secondtoken = 0; int type_count = 0; int after_token 
         delegate_type[type_count] |
 
         // call
-        { isoption(parser_options, SRCML_OPTION_CPP) && (inMode(MODE_ACCESS_REGION) || (perform_call_check(type, isempty, call_count, secondtoken) && type == MACRO)) }?
+        { isoption(parser_options, SRCML_PARSER_OPTION_CPP) && (inMode(MODE_ACCESS_REGION) || (perform_call_check(type, isempty, call_count, secondtoken) && type == MACRO)) }?
         macro_call |
 
         { inMode(MODE_ENUM) && inMode(MODE_LIST) }? enum_short_variable_declaration |
@@ -1083,7 +1074,7 @@ pattern_statements[] { int secondtoken = 0; int type_count = 0; int after_token 
 ;
 
 // efficient way to view the token after the current LA(1)
-next_token[] returns [int token] {
+next_token[] returns [unsigned int token] {
 
         if (LT(1)->getColumn() == current_column && LT(1)->getLine() == current_line) {
 
@@ -1136,7 +1127,7 @@ next_token_check[int token1, int token2] returns [bool result] {
 // skips past any skiptokens to get the one after
 look_past[int skiptoken] returns [int token] {
 
-        int place = mark();
+        unsigned int place = mark();
         inputState->guessing++;
 
         while (LA(1) == skiptoken)
@@ -1929,7 +1920,7 @@ perform_call_check[CALL_TYPE& type, bool& isempty, int& call_count, int secondto
         type = CALL;
 
         // call syntax succeeded, however post call token is not legitimate
-        if (isoption(parser_options, SRCML_OPTION_CPP) &&
+        if (isoption(parser_options, SRCML_PARSER_OPTION_CPP) &&
             (((!inLanguage(LANGUAGE_OBJECTIVE_C) || !inTransparentMode(MODE_OBJECTIVE_C_CALL)) && (keyword_token_set.member(postcalltoken) || postcalltoken == NAME || postcalltoken == VOID))
             || (!inLanguage(LANGUAGE_CSHARP) && postcalltoken == LCURLY)
             || postcalltoken == EXTERN || postcalltoken == STRUCT || postcalltoken == UNION || postcalltoken == CLASS || postcalltoken == CXX_CLASS
@@ -1950,11 +1941,11 @@ perform_call_check[CALL_TYPE& type, bool& isempty, int& call_count, int secondto
 
         type = NOCALL;
 
-        if (isoption(parser_options, SRCML_OPTION_CPP) && argumenttoken != 0 && postcalltoken == 0)
+        if (isoption(parser_options, SRCML_PARSER_OPTION_CPP) && argumenttoken != 0 && postcalltoken == 0)
             type = MACRO;
 
         // single macro call followed by statement_cfg
-        else if (isoption(parser_options, SRCML_OPTION_CPP) && secondtoken != -1
+        else if (isoption(parser_options, SRCML_PARSER_OPTION_CPP) && secondtoken != -1
                  && (keyword_token_set.member(secondtoken) || secondtoken == LCURLY || secondtoken == 1 /* EOF */
                      || secondtoken == PUBLIC || secondtoken == PRIVATE || secondtoken == PROTECTED))
 
@@ -1979,7 +1970,7 @@ call_check[int& postnametoken, int& argumenttoken, int& postcalltoken, bool& ise
         markend[postnametoken]
         set_bool[isempty, (LA(1) == LPAREN && next_token() == RPAREN) || (inLanguage(LANGUAGE_CXX) && LA(1) == LCURLY && next_token() == RCURLY)]
         (
-            { isoption(parser_options, SRCML_OPTION_CPP) }?
+            { isoption(parser_options, SRCML_PARSER_OPTION_CPP) }?
             // check for proper form of argument list
             (call_check_paren_pair[argumenttoken] set_int[call_count, call_count + 1])*
 
@@ -2834,7 +2825,7 @@ namespace_directive[] { ENTRY_DEBUG } :
         USING
 ;
 
-using_aliasing[]  { int type_count;  int secondtoken = 0; int after_token = 0; STMT_TYPE stmt_type = NONE; ENTRY_DEBUG } :
+using_aliasing[]  { int type_count = 0;  int secondtoken = 0; int after_token = 0; STMT_TYPE stmt_type = NONE; ENTRY_DEBUG } :
         {
             // start a new mode that will end after the argument list
             startNewMode(MODE_LIST | MODE_IN_INIT | MODE_EXPRESSION | MODE_EXPECT);
@@ -3066,7 +3057,7 @@ protocol_definition[] { bool first = true; ENTRY_DEBUG } :
 // handle class header
 objective_c_class_header[] { ENTRY_DEBUG } :
 
-        { isoption(parser_options, SRCML_OPTION_CPP) }?
+        { isoption(parser_options, SRCML_PARSER_OPTION_CPP) }?
         (macro_call_check class_header_base LCURLY)=>
            macro_call objective_c_class_header_base |
 
@@ -3282,7 +3273,7 @@ class_default_access_action[int access_token] { ENTRY_DEBUG } :
 // handle class header
 class_header[] { ENTRY_DEBUG } :
 
-        { isoption(parser_options, SRCML_OPTION_CPP) && next_token() != DCOLON }?
+        { isoption(parser_options, SRCML_PARSER_OPTION_CPP) && next_token() != DCOLON }?
         (macro_call_check class_header_base LCURLY)=>
            macro_call class_header_base |
 
@@ -3455,7 +3446,7 @@ block_end[] { bool in_issue_empty = inTransparentMode(MODE_ISSUE_EMPTY_AT_POP); 
             endDownToModeSet(MODE_BLOCK | MODE_TOP | MODE_IF | MODE_ELSE | MODE_TRY | MODE_ANONYMOUS);
 
             bool endstatement = inMode(MODE_END_AT_BLOCK);
-            bool anonymous_class = (inMode(MODE_CLASS) | inMode(MODE_ENUM)) && inMode(MODE_END_AT_BLOCK);
+            bool anonymous_class = (inMode(MODE_CLASS) || inMode(MODE_ENUM)) && inMode(MODE_END_AT_BLOCK);
 
             // some statements end with the block
             if (inMode(MODE_END_AT_BLOCK)) {
@@ -3789,7 +3780,7 @@ statement_part[] { int type_count; int secondtoken = 0; int after_token = 0; STM
 
         // start of argument for return or throw statement
         { inMode(MODE_EXPRESSION | MODE_EXPECT) &&
-            isoption(parser_options, SRCML_OPTION_CPP) && perform_call_check(type, isempty, call_count, secondtoken) && type == MACRO }?
+            isoption(parser_options, SRCML_PARSER_OPTION_CPP) && perform_call_check(type, isempty, call_count, secondtoken) && type == MACRO }?
         macro_call |
 
         { inMode(MODE_EXPRESSION | MODE_EXPECT) }?
@@ -4561,9 +4552,8 @@ pattern_check_core[int& token,      /* second token, after name (always returned
 
 // C# global attribute target
 check_global_attribute[] returns [bool flag] {
-        const std::string& s = LT(1)->getText();
 
-        flag = s == "module" || s == "assembly";
+        flag =  LT(1)->getText() == "module"sv || LT(1)->getText() == "assembly"sv;
 } :;
 
 /*
@@ -5596,7 +5586,7 @@ compound_name_cpp[bool& iscompound] { namestack.fill(""); bool iscolon = false; 
         { notdestructor = LA(1) == DESTOP; }
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 }
 
 // compound name for C#
@@ -5619,7 +5609,7 @@ compound_name_csharp[bool& iscompound] { namestack.fill(""); ENTRY_DEBUG } :
         )*
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 }
 
 // compound name for C
@@ -5709,7 +5699,7 @@ keyword_name_inner[bool& iscompound] { namestack.fill(""); ENTRY_DEBUG } :
         { notdestructor = LA(1) == DESTOP; }
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 }
 
 // an identifier
@@ -6537,7 +6527,7 @@ macro_call_inner[] { CompleteElement element(this); bool first = true; ENTRY_DEB
         } set_bool[first, false] )*
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 
         // no end found to macro
         if (isoption(parser_options, SRCML_OPTION_DEBUG))
@@ -6664,7 +6654,7 @@ macro_call_argument_list[] { bool first = true; ENTRY_DEBUG } :
         } set_bool[first, false] )*
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 
         // no end found to macro
         if (isoption(parser_options, SRCML_OPTION_DEBUG))
@@ -6713,7 +6703,7 @@ macro_type_name_call_inner[] { CompleteElement element(this); bool first = true;
         set_bool[first, false] )*
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 
         // no end found to macro
         if (isoption(parser_options, SRCML_OPTION_DEBUG))
@@ -7526,7 +7516,7 @@ general_operators[] { LightweightElement element(this); ENTRY_DEBUG } :
         (
             OPERATORS | ASSIGNMENT | TEMPOPS |
             TEMPOPE (options { greedy = true;  } : ({ SkipBufferSize() == 0 }? TEMPOPE) ({ SkipBufferSize() == 0 }? TEMPOPE)?
-             | ({ inLanguage(LANGUAGE_JAVA) && LT(1)->getText() == ">>=" }? ASSIGNMENT))? |
+             | ({ inLanguage(LANGUAGE_JAVA) && LT(1)->getText() == ">>="sv }? ASSIGNMENT))? |
             EQUAL | /*MULTIMM |*/ DESTOP | /* MEMBERPOINTER |*/ MULTOPS | REFOPS | DOTDOT | RVALUEREF | { inLanguage(LANGUAGE_JAVA) }? BAR |
 
             // others are not combined
@@ -8019,7 +8009,7 @@ complex_literal[] { LightweightElement element(this); ENTRY_DEBUG } :
         {
             startElement(SCOMPLEX);
         }
-        COMPLEX_NUMBER ({ (LT(1)->getText() == "+" || LT(1)->getText() == "-") && next_token() == CONSTANTS }? OPERATORS CONSTANTS)?
+        COMPLEX_NUMBER ({ (LT(1)->getText() == "+"sv || LT(1)->getText() == "-"sv) && next_token() == CONSTANTS }? OPERATORS CONSTANTS)?
   
 ;
 
@@ -8035,7 +8025,7 @@ literal[bool markup = true] { LightweightElement element(this); TokenPosition tp
             }
 
         }
-        CONSTANTS ({ (LT(1)->getText() == "+" || LT(1)->getText() == "-") && next_token() == COMPLEX_NUMBER }? OPERATORS COMPLEX_NUMBER {  if (markup) tp.setType(SCOMPLEX); })?
+        CONSTANTS ({ (LT(1)->getText() == "+"sv || LT(1)->getText() == "-"sv) && next_token() == COMPLEX_NUMBER }? OPERATORS COMPLEX_NUMBER {  if (markup) tp.setType(SCOMPLEX); })?
 ;
 
 
@@ -8466,7 +8456,7 @@ template_param[] { in_template_param = true; ENTRY_DEBUG } :
     set_bool[in_template_param, false]
 ;
 exception
-catch[antlr::RecognitionException] {
+catch[antlr::RecognitionException&] {
 
     in_template_param = false;
     throw antlr::RecognitionException();
@@ -8758,7 +8748,7 @@ template_argument[bool in_function_type = false] { CompleteElement element(this)
             else
                startElement(STEMPLATE_PARAMETER);
 
-            if (inLanguage(LANGUAGE_CXX) | inLanguage(LANGUAGE_C))
+            if (inLanguage(LANGUAGE_CXX) || inLanguage(LANGUAGE_C))
                startElement(SEXPRESSION);
         }
         (options { greedy = true; } :
@@ -9273,9 +9263,6 @@ cpp_check_end[] returns[bool is_end = false] {
 
  if (LA(1) == EOL || LA(1) == LINE_COMMENT_START || LA(1) == BLOCK_COMMENT_START || LA(1) == JAVADOC_COMMENT_START || LA(1) == DOXYGEN_COMMENT_START || LA(1) == LINE_DOXYGEN_COMMENT_START || LA(1) == EOF || LA(1) == 1)  /* EOF */
      return true;
-
- return false;
-
 }:;
 
 // skip to eol
@@ -9429,8 +9416,13 @@ eol_post[int directive_token, bool markblockzero] {
                 // should work unless also creates a dangling lcurly or lparen
                 // in which case may need to run on everthing except else.
                 // Leaving off for now, with no option. Test thoroughly, and then turn on by default
+#ifdef _MSC_VER
+#   pragma warning (push, 0)
+#endif
                 if (false && !inputState->guessing) {
-
+#ifdef _MSC_VER
+    #pragma warning (pop)
+#endif
                     for (auto& item : cppif_end_count_check()) {
 
                         if (item == RCURLY) {
@@ -9492,7 +9484,7 @@ eol_post[int directive_token, bool markblockzero] {
                 ++cpp_ifcount;
 
                 // create new context for #if (and possible #else)
-                if (!isoption(parser_options, SRCML_OPTION_CPP_TEXT_ELSE) && !inputState->guessing)
+                if (!isoption(parser_options, SRCML_PARSER_OPTION_CPP_TEXT_ELSE) && !inputState->guessing)
                     cppmode.push(cppmodeitem(size()));
 
                 break;
@@ -9510,7 +9502,7 @@ eol_post[int directive_token, bool markblockzero] {
                     cpp_ifcount = 1;
                 }
 
-                if (isoption(parser_options, SRCML_OPTION_CPP_TEXT_ELSE) && !inputState->guessing) {
+                if (isoption(parser_options, SRCML_PARSER_OPTION_CPP_TEXT_ELSE) && !inputState->guessing) {
 
                     // create an empty cppmode for #if if one doesn't exist
                     if (cppmode.empty())
@@ -9537,7 +9529,7 @@ eol_post[int directive_token, bool markblockzero] {
                 if (cpp_skipelse && cpp_ifcount == 0)
                     cpp_skipelse = false;
 
-                if (isoption(parser_options, SRCML_OPTION_CPP_TEXT_ELSE) && !inputState->guessing &&
+                if (isoption(parser_options, SRCML_PARSER_OPTION_CPP_TEXT_ELSE) && !inputState->guessing &&
                     !cppmode.empty()) {
 
                     // add new context for #endif in current #if
@@ -9561,9 +9553,9 @@ eol_post[int directive_token, bool markblockzero] {
                 - when guessing and in else (unless in zero block)
                 - when ??? for cppmode
         */
-        if ((!isoption(parser_options, SRCML_OPTION_CPP_MARKUP_IF0) && cpp_zeromode) ||
-            (isoption(parser_options, SRCML_OPTION_CPP_TEXT_ELSE) && cpp_skipelse) ||
-            (isoption(parser_options, SRCML_OPTION_CPP_TEXT_ELSE) && inputState->guessing && cpp_skipelse) ||
+        if ((!isoption(parser_options, SRCML_PARSER_OPTION_CPP_MARKUP_IF0) && cpp_zeromode) ||
+            (isoption(parser_options, SRCML_PARSER_OPTION_CPP_TEXT_ELSE) && cpp_skipelse) ||
+            (isoption(parser_options, SRCML_PARSER_OPTION_CPP_TEXT_ELSE) && inputState->guessing && cpp_skipelse) ||
             (!cppmode.empty() && !cppmode.top().isclosed && cppmode.top().skipelse)
         ) {
             while (LA(1) != PREPROC && LA(1) != 1 /* EOF */)
@@ -9602,7 +9594,7 @@ line_continuation[] { ENTRY_DEBUG } :
 // condition in cpp
 cpp_condition[bool& markblockzero] { CompleteElement element(this); ENTRY_DEBUG } :
 
-        set_bool[markblockzero, LA(1) == CONSTANTS && LT(1)->getText() == "0"]
+        set_bool[markblockzero, LA(1) == CONSTANTS && LT(1)->getText() == "0"sv]
 
         cpp_complete_expression
 ;

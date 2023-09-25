@@ -15,6 +15,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+<<<<<<< HEAD
       - name: Cache Build
         id: cache
         uses: actions/cache@v2
@@ -22,15 +23,23 @@ jobs:
           path: build
           key: ${{ runner.os }}-client1
 
+=======
+>>>>>>> upstream/issue1942
       - name: Setup Ubuntu
         shell: bash
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
+<<<<<<< HEAD
           sudo apt update
           sudo apt install curl zip g++ make ninja-build antlr libantlr-dev \
                            libxml2-dev libxml2-utils libxslt1-dev \
                            libarchive-dev libssl-dev libcurl4-openssl-dev \
                            cpio man file dpkg-dev
+=======
+          sudo apt install antlr libantlr-dev libantlr-java libarchive-dev \
+                           libcurl4-openssl-dev libxml2-utils libxslt1-dev \
+                           ninja-build
+>>>>>>> upstream/issue1942
           curl -L http://www.sdml.cs.kent.edu/build/srcML-1.0.0-Boost.tar.gz | \
               sudo tar xz -C /usr/local/include
 
@@ -38,7 +47,11 @@ jobs:
         shell: bash
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
+<<<<<<< HEAD
           brew install ninja antlr2
+=======
+          brew install ninja antlr2 --display-times
+>>>>>>> upstream/issue1942
           curl -L http://www.sdml.cs.kent.edu/build/srcML-1.0.0-Boost.tar.gz | \
             sudo tar xz -C /usr/local/include
 
@@ -48,23 +61,37 @@ jobs:
 
       - name: Create build directory
         shell: bash
+<<<<<<< HEAD
         if: ${{ !steps.cache.outputs.cache-hit }}
         run: mkdir build
 
       - name: Build on Windows
+=======
+        run: mkdir build
+
+      - name: CMake Setup on Windows
+>>>>>>> upstream/issue1942
         shell: bash
         if: ${{ matrix.os == 'windows-latest' }}
         working-directory: build
         run: |
+<<<<<<< HEAD
           cmake ..
           cmake --build . --config Release --target install
 
       - name: Build on Ubuntu/macOS
+=======
+          export UseMultiToolTask=true
+          cmake ..
+
+      - name: CMake Setup on Ubuntu/macOS
+>>>>>>> upstream/issue1942
         shell: bash
         if: ${{ matrix.os != 'windows-latest' }}
         working-directory: build
         run: |
           cmake .. -G Ninja
+<<<<<<< HEAD
           sudo cmake --build . --config Release --target install
 
       - name: Finish install for Ubuntu
@@ -73,6 +100,43 @@ jobs:
         working-directory: build
         run: |
           sudo ldconfig
+=======
+
+      - name: Build
+        shell: bash
+        working-directory: build
+        run: |
+          export UseMultiToolTask=true
+          cmake --build . --config Release
+
+      - name: Install on Windows
+        shell: bash
+        if: ${{ matrix.os == 'windows-latest' }}
+        working-directory: build
+        run: |
+          cmake --build . --config Release --target install
+
+      - name: Install on Ubuntu/macOS
+        shell: bash
+        if: ${{ matrix.os != 'windows-latest' }}
+        working-directory: build
+        run: |
+          sudo cmake --build . --config Release --target install
+
+      - name: Set PATH for Windows
+        shell: bash
+        if: ${{ matrix.os == 'windows-latest' }}
+        working-directory: build
+        run: |
+          echo "/c/Program Files (x86)/srcML/bin" >> $GITHUB_PATH
+
+      - name: Run Installed srcml
+        shell: bash
+        working-directory: build
+        run: |
+          srcml --version
+          srcml --text="int a;" -l C++
+>>>>>>> upstream/issue1942
 
       - name: Setup msys2 with additional client-test packages for Windows
         if: ${{ matrix.os == 'windows-latest' }}
@@ -96,18 +160,30 @@ jobs:
           ctest -C Release -VV
       - uses: actions/upload-artifact@v2
         with:
+<<<<<<< HEAD
           name: ClientLastTest.${{ runner.os }}.log
+=======
+          name: ClientTest.${{ runner.os }}.log
+>>>>>>> upstream/issue1942
           path: build/Testing/Temporary/LastTest.log
 
       - name: Ubuntu/macOS Client Tests on Installed srcml
         if: ${{ matrix.os != 'windows-latest' }}
         shell: bash
         working-directory: build
+<<<<<<< HEAD
+=======
+        continue-on-error: true
+>>>>>>> upstream/issue1942
         run: |
           ctest -VV
       - uses: actions/upload-artifact@v2
         with:
+<<<<<<< HEAD
           name: ClientLastTest.${{ runner.os }}.log
+=======
+          name: ClientTest.${{ runner.os }}.log
+>>>>>>> upstream/issue1942
           path: build/Testing/Temporary/LastTest.log
 
       - name: Build libsrcml Tests
@@ -115,6 +191,10 @@ jobs:
         working-directory: build
         continue-on-error: true
         run: |
+<<<<<<< HEAD
+=======
+          export UseMultiToolTask=true
+>>>>>>> upstream/issue1942
           cmake .. -DBUILD_LIBSRCML_TESTS=ON
           cmake --build . --config Release --target build_libsrcml_tests
 
@@ -126,7 +206,11 @@ jobs:
           ctest -C Release -R ^test_
       - uses: actions/upload-artifact@v2
         with:
+<<<<<<< HEAD
           name: libsrcmlLastTest.${{ runner.os }}.log
+=======
+          name: libsrcmlTest.${{ runner.os }}.log
+>>>>>>> upstream/issue1942
           path: build/Testing/Temporary/LastTest.log
 
       - name: Generate Parser Tests

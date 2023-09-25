@@ -1,82 +1,79 @@
+# SPDX-License-Identifier: GPL-3.0-only
 ##
 # @file CMakeLists.txt
-# 
+#
 # @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
-# 
-# The srcML Toolkit is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-# 
-# The srcML Toolkit is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with the srcML Toolkit; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-# 
+#
 # CMake files for the srcML client
 
-# strip executables
-set(CPACK_STRIP_FILES ON)
- 
-set(CMAKE_EXTERNAL_SOURCE_DIR ${CMAKE_BINARY_DIR}/external)
+# if(NOT srcML::LibsrcML)
+#     find_package(srcml REQUIRED)
+# endif()
 
-set(CLI11_EXTERNAL ${CMAKE_EXTERNAL_SOURCE_DIR}/CLI11.hpp)
-if(NOT EXISTS ${CLI11_EXTERNAL})
-    file(DOWNLOAD https://github.com/CLIUtils/CLI11/releases/download/v1.8.0/CLI11.hpp ${CLI11_EXTERNAL})
+# Configure libarchive on macOS
+if(APPLE AND NOT DEFINED VCPKG_TARGET_TRIPLET)
+    set(APPLE_NON_VCPKG ON)
 endif()
-set(CTPL_EXTERNAL ${CMAKE_EXTERNAL_SOURCE_DIR}/ctpl_stl.h)
-if(NOT EXISTS ${CTPL_EXTERNAL})
-    file(DOWNLOAD https://raw.githubusercontent.com/vit-vit/CTPL/ctpl_v.0.0.2/ctpl_stl.h ${CTPL_EXTERNAL})
+if(APPLE_NON_VCPKG)
+    include(macos-libarchive.cmake)
 endif()
 
-set(SRCML_LIBRARIES ${LibArchive_LIBRARIES} ${CURL_LIBRARIES}
-                CACHE INTERNAL "Libraries needed to build srcml")
-if(NOT WIN32 AND APPLE)
-    list(APPEND SRCML_LIBRARIES pthread)
-elseif(NOT WIN32)
-    list(APPEND SRCML_LIBRARIES crypto pthread)
-elseif(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    list(APPEND SRCML_LIBRARIES ws2_32 crypto)
-else()
-    list(APPEND SRCML_LIBRARIES ws2_32 ${LIBSRCML_LIBRARIES})
+find_package(LibArchive 3 REQUIRED)
+find_package(CURL REQUIRED)
+
+# rpath needs help on macos
+if(APPLE)
+    # Use rpath for the install directory
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+    # Specify the rpath directory (in this case, /usr/local/lib)
+    list(APPEND CMAKE_INSTALL_RPATH "/usr/local/lib")
 endif()
 
+include(FetchContent)
+FetchContent_Declare(cli11
+  URL https://github.com/CLIUtils/CLI11/releases/download/v2.3.2/CLI11.hpp
+  DOWNLOAD_NO_EXTRACT TRUE
+)
+FetchContent_MakeAvailable(cli11)
+add_library(cli11 INTERFACE IMPORTED)
+target_include_directories(cli11 SYSTEM INTERFACE ${cli11_SOURCE_DIR})
+
+# ctpl_stl external include
+include(FetchContent)
+FetchContent_Declare(ctpl_stl
+  GIT_REPOSITORY https://github.com/vit-vit/CTPL.git
+  GIT_TAG        v.0.0.2
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(ctpl_stl)
+add_library(ctpl_stl INTERFACE IMPORTED)
+target_include_directories(ctpl_stl SYSTEM INTERFACE ${ctpl_stl_SOURCE_DIR})
+
+# srcml executable
 file(GLOB CLIENT_SOURCE *.hpp *.cpp)
-
 add_executable(srcml ${CLIENT_SOURCE})
-target_include_directories(srcml BEFORE PRIVATE . ${CMAKE_EXTERNAL_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src/libsrcml)
+target_include_directories(srcml BEFORE PRIVATE .)
+target_link_libraries(srcml PRIVATE srcML::LibsrcML LibArchive::LibArchive CURL::libcurl cli11 ctpl_stl)
 
-# Add coverage to default part of Debug
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_COMPILER_IS_GNUCXX)
-    target_link_libraries(srcml libsrcml_link ${SRCML_LIBRARIES} gcov)
-else()
-    target_link_libraries(srcml libsrcml_link ${SRCML_LIBRARIES})
+# Put executable in bin directory
+set_target_properties(srcml PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# PreCompiled Headers configuration of the client
+if (SRCML_CLIENT_PCH)
+    target_precompile_headers(srcml PRIVATE "${SRCML_CLIENT_PCH}")
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set_target_properties(srcml PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-    add_custom_command(TARGET srcml POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${PROJECT_SOURCE_DIR}/deps/$<CONFIGURATION>/bin"
-    $<TARGET_FILE_DIR:srcml>)
-elseif(APPLE)
-    # Making the exported_symbols_list an empty file reduces size of executable, as strip does not work
-    set_target_properties(srcml PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin LINK_FLAGS "-exported_symbols_list /dev/null")
-elseif(WIN32)
-    # @BUILD Why this when there is a MSVC case above?
-    set_target_properties(srcml PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin LINK_FLAGS "-Wl,--allow-multiple-definition")
-else()
-    set_target_properties(srcml PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-endif()
+# Set the flags for the srcml client
+target_compile_options(srcml PRIVATE "${SRCML_CLIENT_COMPILE_FLAGS}")
+set_target_properties(srcml PROPERTIES LINK_FLAGS "${SRCML_CLIENT_LINK_FLAGS}")
 
-# strip for release mode
-if(NOT APPLE)
-    set_target_properties(libsrcml_shared PROPERTIES LINK_FLAGS_RELEASE -s)
-endif()
-
-
+# Install the client
 install(TARGETS srcml COMPONENT SRCML)
+
+# On Windows with vcpkg, install all the dlls that the vcpkg used
+# Handled in libsrcml
+
+if(MSVC)
+    set_source_files_properties(srcml_cli.cpp PROPERTIES COMPILE_FLAGS /wd4866)
+endif()

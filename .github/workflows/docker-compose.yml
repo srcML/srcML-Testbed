@@ -1,0 +1,88 @@
+x-configuration: &CONFIGURATION
+  platform: ${PLATFORM:-linux/arm64}
+  volumes:
+    - ~/srcML:/srcML:ro
+    - ~/srcML-Data:/Data
+    - ~/Builds:/Builds
+  working_dir: /srcML-build
+  command: bash -c "${COMPOSE_COMMAND-
+    cmake -G Ninja -DCMAKE_UNITY_BUILD=ON /srcML;
+    ninja;
+    cpack;
+    cp dist/* /Builds/.
+    }
+    ${COMPOSE_APPEND- }"
+
+services:
+
+  # ubuntu_latest:
+  #   image: srcml/ubuntu:latest
+  #   <<: *CONFIGURATION
+
+  # ubuntu_rolling:
+  #   image: srcml/ubuntu:rolling
+  #   <<: *CONFIGURATION
+
+  ubuntu_23.04:
+    image: srcml/ubuntu:23.04
+    <<: *CONFIGURATION
+
+  # ubuntu_22.10:
+  #   image: srcml/ubuntu:22.10
+  #   <<: *CONFIGURATION
+
+  # ubuntu_22.04:
+  #   image: srcml/ubuntu:22.04
+  #   <<: *CONFIGURATION
+
+  # ubuntu_20.04:
+  #   image: srcml/ubuntu:20.04
+  #   <<: *CONFIGURATION
+
+  ubuntu_18.04:
+    image: srcml/ubuntu:18.04
+    <<: *CONFIGURATION
+
+  # fedora_latest:
+  #   image: srcml/fedora:latest
+  #   <<: *CONFIGURATION
+
+  # fedora_rawhide:
+  #   image: srcml/fedora:rawhide
+  #   <<: *CONFIGURATION
+
+  fedora_39:
+    image: srcml/fedora:39
+    <<: *CONFIGURATION
+
+  # fedora_38:
+  #   image: srcml/fedora:38
+  #   <<: *CONFIGURATION
+
+  # fedora_37:
+  #   image: srcml/fedora:37
+  #   <<: *CONFIGURATION
+
+  fedora_36:
+    image: srcml/fedora:36
+    <<: *CONFIGURATION
+
+  opensuse_15.5:
+    image: srcml/opensuse:15.5
+    <<: *CONFIGURATION
+
+  # opensuse_15.4:
+  #   image: srcml/opensuse:15.4
+  #   <<: *CONFIGURATION
+
+  # opensuse_15.3:
+  #   image: srcml/opensuse:15.3
+  #   <<: *CONFIGURATION
+
+  # opensuse_15.2:
+  #   image: srcml/opensuse:15.2
+  #   <<: *CONFIGURATION
+
+  opensuse_15.1:
+    image: srcml/opensuse:15.1
+    <<: *CONFIGURATION

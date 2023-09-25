@@ -1,30 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file sax2_srcsax_handler.cpp
  *
  * @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
- *
- * This file is part of the srcML SAX2 Framework.
- *
- * The srcML SAX2 Framework is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML SAX2 Framework is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- *  You should have received a copy of the GNU General Public License
- * along with the srcML SAX2 Framework; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <sax2_srcsax_handler.hpp>
 #include <srcmlns.hpp>
 #include <string>
-#include <algorithm>
 #include <cstring>
+#include <algorithm>
 
 #include <libxml/parser.h>
 #include <libxml/parserInternals.h>
@@ -47,12 +32,6 @@
     #define SRCSAX_DEBUG_START_CHARS(ch,len)
     #define SRCSAX_DEBUG_END_CHARS(ch,len)
 #endif
-
-// libxml2 places elements into a dictionary
-// once initialized, can compare pointers instead of strings
-static const xmlChar* UNIT_ENTRY = nullptr;
-static const xmlChar* MACRO_LIST_ENTRY = nullptr;
-static const xmlChar* ESCAPE_ENTRY = nullptr;
 
 /**
  * factory
@@ -150,7 +129,7 @@ static int reparse_root(void* ctx) {
                     (const char*) prefix, (const char*) URI, nb_namespaces, namespaces, nb_attributes, attributes);
     };
 
-    xmlParserCtxtPtr context = xmlCreateMemoryParserCtxt(state->rootstarttag.c_str(), (int) state->rootstarttag.size());
+    xmlParserCtxtPtr context = xmlCreateMemoryParserCtxt(state->rootstarttag.data(), (int) state->rootstarttag.size());
     auto save_private = context->_private;
     context->_private = state;
     auto save_sax = context->sax;
@@ -191,9 +170,9 @@ void start_document(void* ctx) {
     SRCSAX_DEBUG_START("");
 
     // save for dictionary lookup of common elements
-    UNIT_ENTRY       = xmlDictLookup(ctxt->dict, (const xmlChar*) "unit", (int) strlen("unit"));
-    MACRO_LIST_ENTRY = xmlDictLookup(ctxt->dict, (const xmlChar*) "macro-list", (int) strlen("macro-list"));
-    ESCAPE_ENTRY     = xmlDictLookup(ctxt->dict, (const xmlChar*) "escape", (int) strlen("escape"));
+    state->UNIT_ENTRY       = xmlDictLookup(ctxt->dict, (const xmlChar*) "unit", (int)"unit"sv.size());
+    state->MACRO_LIST_ENTRY = xmlDictLookup(ctxt->dict, (const xmlChar*) "macro-list", (int)"macro-list"sv.size());
+    state->ESCAPE_ENTRY     = xmlDictLookup(ctxt->dict, (const xmlChar*) "escape", (int)"escape"sv.size());
 
     // save the encoding from the input
     state->context->encoding = "UTF-8";
@@ -269,47 +248,59 @@ void start_root(void* ctx, const xmlChar* localname, const xmlChar* prefix, cons
 
     // save the root start tag because we are going to parse it again to generate proper start_root() and start_unit()
     // calls after we know whether this is an archive or not
-    state->rootstarttag.reserve(ctxt->input->cur - state->base + 2);
-    state->rootstarttag.assign((const char*) state->base, ctxt->input->cur - state->base);
-    state->rootstarttag.append("/>");
+    state->rootstarttag.reserve(static_cast<std::size_t>(ctxt->input->cur - state->base + 2));
+    state->rootstarttag.assign((const char*) state->base, static_cast<std::size_t>(ctxt->input->cur - state->base));
+    state->rootstarttag += '/';
+    state->rootstarttag += '>';
 
     // record namespace string in an extensible list so we can add the per unit
     if (state->collect_unit_body) {
 
         // precalculate length
         int ns_length = nb_namespaces * 2;
-        int size = 0;
-        for (int i = 0; i < ns_length; i += 2) {
+
+        // Convert to string_view
+        std::vector<std::string_view> namespaceStrings(static_cast<std::size_t>(ns_length));
+        for (std::size_t i = 0; i < static_cast<std::size_t>(ns_length); ++i) {
+            namespaceStrings[i] = namespaces[i] ? (const char*) namespaces[i] : "";
+        }
+
+        std::size_t size = 0;
+        for (std::size_t i = 0; i < static_cast<std::size_t>(ns_length); i += 2) {
 
             // state->rootnsstr += "xmlns";
             size += 5;
             if (namespaces[i]) {
                 // state->rootnsstr += ":";
                 // state->rootnsstr += (const char*) namespaces[i];
-                size += 1 + (int) strlen((const char*) namespaces[i]);
+                size += 1 + namespaceStrings[i].size();
             }
             // state->rootnsstr += "=\"";
             // state->rootnsstr += (const char*) namespaces[i + 1];
             // state->rootnsstr += "\" ";
-            size += 2 + (int) strlen((const char*) namespaces[i + 1]) + 2;
+            size += 2 + namespaceStrings[i + 1].size() + 2;
         }
 
         state->rootnsstr.reserve(size);
 
         for (int i = 0; i < ns_length; i += 2) {
 
-            state->rootnsstr += "xmlns";
+            for (auto c : "xmlns"sv)
+                state->rootnsstr += c;
+
             if (namespaces[i]) {
-                state->rootnsstr += ":";
-                state->rootnsstr += (const char*) namespaces[i];
+                state->rootnsstr += ':';
+                state->rootnsstr += namespaceStrings[static_cast<std::size_t>(i)];
             }
-            state->rootnsstr += "=\"";
-            state->rootnsstr += (const char*) namespaces[i + 1];
-            state->rootnsstr += "\" ";
+            for (auto c : "=\""sv)
+                state->rootnsstr += c;
+            state->rootnsstr += namespaceStrings[static_cast<std::size_t>(i) + 1];
+            for (auto c : "\" "sv)
+                state->rootnsstr += c;
         }
     }
 
-    SRCML_DEBUG("UNIT", state->unitsrcml.c_str(), state->unitsrcml.size());
+    SRCML_DEBUG("UNIT", state->unitsrcml.data(), state->unitsrcml.size());
 
     SRCSAX_DEBUG_END(localname);
 
@@ -373,7 +364,7 @@ void first_start_element(void* ctx, const xmlChar* localname, const xmlChar* pre
 
     // if macros are found, then must return, process first
     // but stay in first_start_element, since this can be between root unit and nested unit
-    if (localname == MACRO_LIST_ENTRY) {
+    if (localname == state->MACRO_LIST_ENTRY) {
 
         state->context->handler->meta_tag(state->context, (const char*) localname, (const char*) prefix, (const char*) URI,
                                           nb_namespaces, namespaces, nb_attributes, attributes);
@@ -381,7 +372,7 @@ void first_start_element(void* ctx, const xmlChar* localname, const xmlChar* pre
     }
 
     // archive when the first element after the root is <unit>
-    state->context->is_archive = (localname == UNIT_ENTRY);
+    state->context->is_archive = (localname == state->UNIT_ENTRY);
 
     // turn off first_start_element() handling
     ctxt->sax->startElementNs = &start_element;
@@ -439,10 +430,11 @@ void start_unit(void* ctx, const xmlChar* localname, const xmlChar* prefix, cons
         return;
 
     // collect cpp prefix
+    state->cpp_prefix = std::nullopt;
     for (int i = 0; i < nb_namespaces; ++i) {
 
-        if (std::string((const char*) namespaces[i * 2 + 1]) == SRCML_CPP_NS_URI) {
-            state->cpp_prefix = namespaces[i * 2] ? "" : (const char*) namespaces[i * 2];
+        if ((const char*) namespaces[i * 2 + 1] == SRCML_CPP_NS_URI) {
+            state->cpp_prefix = namespaces[i * 2] ? (const char*) namespaces[i * 2] : "";
         }
     }
 
@@ -454,37 +446,37 @@ void start_unit(void* ctx, const xmlChar* localname, const xmlChar* prefix, cons
 
     state->unit_count += 1;
 
-    if (true || state->collect_unit_body) {
+    std::string_view localnameString(localname ? (const char*) localname : "");
+    std::string_view prefixString(prefix ? (const char*) prefix : "");
 
-        // find end of unit tag name, e.g., end of "<unit" or "<src:unit"
-        int pos = (int) (1 + strlen((const char*) localname) + (prefix ? strlen((const char*) prefix) + 1 : 0) + 1);
+    // find end of unit tag name, e.g., end of "<unit" or "<src:unit"
+    int pos = (int) (1 + localnameString.size() + (!prefixString.empty() ? prefixString.size() + 1 : 0) + 1);
 
-        if (pos >= 0) {
-            // merge the namespaces from the root into this one
-            state->unitsrcml.reserve(ctxt->input->cur - state->base + 1 + (state->context->is_archive ? state->rootnsstr.size() : 0));
-            state->unitsrcml.assign((const char*) state->base, pos);
-            state->insert_begin = (int) state->unitsrcml.size();
-            if (state->context->is_archive) {
-                state->unitsrcml.append(state->rootnsstr);
-                state->insert_end = (int) state->unitsrcml.size();
-            }
-
-            state->unitsrcml.append((const char*) state->base + pos, ctxt->input->cur - state->base + 1 - pos);
-
-            if (!state->context->is_archive) {
-                std::string& s = state->unitsrcml;
-                auto pos = s.find("xmlns");
-                auto firstquote = s.find("\"", pos + 1);
-                auto secondquote = s.find("\"", firstquote + 1);
-                state->insert_end = (int) secondquote + 2;
-            }
+    if (pos >= 0) {
+        // merge the namespaces from the root into this one
+        state->unitsrcml.reserve(ctxt->input->cur - state->base + 1 + (state->context->is_archive ? state->rootnsstr.size() : 0));
+        state->unitsrcml.assign((const char*) state->base, static_cast<std::size_t>(pos));
+        state->insert_begin = (int) state->unitsrcml.size();
+        if (state->context->is_archive) {
+            state->unitsrcml.append(state->rootnsstr);
+            state->insert_end = (int) state->unitsrcml.size();
         }
 
-        SRCML_DEBUG("UNIT", state->unitsrcml.c_str(), state->unitsrcml.size());
+        state->unitsrcml.append((const char*) state->base + pos, static_cast<std::size_t>(ctxt->input->cur - state->base + 1 - pos));
 
-        // where the content begins, past the start unit tag
-        state->content_begin = (int) state->unitsrcml.size();
+        if (!state->context->is_archive) {
+            std::string_view s = state->unitsrcml;
+            auto xmlnsPos = s.find("xmlns");
+            auto firstquote = s.find("\"", xmlnsPos + 1);
+            auto secondquote = s.find("\"", firstquote + 1);
+            state->insert_end = (int) secondquote + 2;
+        }
     }
+
+    SRCML_DEBUG("UNIT", state->unitsrcml.data(), state->unitsrcml.size());
+
+    // where the content begins, past the start unit tag
+    state->content_begin = (int) state->unitsrcml.size();
 
     // update position
     state->base = ctxt->input->cur + 1;
@@ -539,7 +531,7 @@ void end_unit(void* ctx, const xmlChar* localname, const xmlChar* prefix, const 
 
     SRCSAX_DEBUG_START(localname);
 
-    SRCML_DEBUG("UNIT", state->unitsrcml.c_str(), state->unitsrcml.size());
+    SRCML_DEBUG("UNIT", state->unitsrcml.data(), state->unitsrcml.size());
 
     state->mode = END_UNIT;
 
@@ -547,8 +539,7 @@ void end_unit(void* ctx, const xmlChar* localname, const xmlChar* prefix, const 
 
     ctxt->sax->startElementNs = &start_unit;
 
-    if (true || state->collect_unit_body)
-        ctxt->sax->ignorableWhitespace = ctxt->sax->characters = &characters_root;
+    ctxt->sax->ignorableWhitespace = ctxt->sax->characters = &characters_root;
 
     SRCSAX_DEBUG_END(localname);
 }
@@ -622,7 +613,7 @@ void start_element(void* ctx, const xmlChar* localname, const xmlChar* /* prefix
 
         // end previous start element
         if (state->base[0] == '>') {
-            state->unitsrcml.append(1, '>');
+            state->unitsrcml += '>';
             state->base += 1;
         }
 
@@ -631,19 +622,20 @@ void start_element(void* ctx, const xmlChar* localname, const xmlChar* /* prefix
             return;
         }
 
-        SRCML_DEBUG("BASE", (const char*) state->base, srcmllen);
+        SRCML_DEBUG("BASE", (const char*) state->base, static_cast<std::size_t>(srcmllen));
 
-        state->unitsrcml.append((const char*) state->base, srcmllen);
+        state->unitsrcml.append((const char*) state->base, static_cast<std::size_t>(srcmllen));
 
-        SRCML_DEBUG("UNIT", state->unitsrcml.c_str(), state->unitsrcml.size());
+        SRCML_DEBUG("UNIT", state->unitsrcml.data(), state->unitsrcml.size());
 
         // Special element <escape char="0x0c"/> used to embed non-XML characters
         // extract the value of the char attribute and add to the src (text)
-        if (localname == ESCAPE_ENTRY) {
+        if (localname == state->ESCAPE_ENTRY) {
 
-            std::string svalue((const char *)attributes[0 * 5 + 3], attributes[0 * 5 + 4] - attributes[0 * 5 + 3]);
+            std::string_view svalue((const char *)attributes[0 * 5 + 3], static_cast<std::size_t>(attributes[0 * 5 + 4] - attributes[0 * 5 + 3]));
 
-            char value = (int)strtol(svalue.c_str(), NULL, 0);
+            // use strtol() instead of atoi() since strtol() understands hex encoding of '0x0?'
+            char value = (char)strtol(svalue.data(), NULL, 0);
 
             state->unitsrc.append(1, value);
         }
@@ -687,9 +679,9 @@ void end_element(void* ctx, const xmlChar* localname, const xmlChar* prefix, con
         }
 
         state->content_end = (int) state->unitsrcml.size() + 1;
-        state->unitsrcml.append((const char*) state->base, srcmllen);
+        state->unitsrcml.append((const char*) state->base, static_cast<std::size_t>(srcmllen));
 
-        SRCML_DEBUG("UNIT", state->unitsrcml.c_str(), state->unitsrcml.size());
+        SRCML_DEBUG("UNIT", state->unitsrcml.data(), state->unitsrcml.size());
     }
 
     state->base = ctxt->input->cur;
@@ -697,7 +689,7 @@ void end_element(void* ctx, const xmlChar* localname, const xmlChar* prefix, con
     SRCSAX_DEBUG_END(localname);
 
     // plain end element
-    if (localname != UNIT_ENTRY) {
+    if (localname != state->UNIT_ENTRY) {
         return;
     }
 
@@ -728,6 +720,10 @@ void end_element(void* ctx, const xmlChar* localname, const xmlChar* prefix, con
  * SAX handler function for character handling at the root level.
  * Immediately calls supplied handlers function.
  */
+#ifdef _MSC_VER
+#   pragma warning (push)
+#   pragma warning (disable : 4100)
+#endif
 void characters_root(void* ctx, const xmlChar* ch, int len) {
 
     auto ctxt = (xmlParserCtxtPtr) ctx;
@@ -746,6 +742,9 @@ void characters_root(void* ctx, const xmlChar* ch, int len) {
 
     SRCSAX_DEBUG_END_CHARS(ch, len);
 }
+#ifdef _MSC_VER
+    #pragma warning (pop)
+#endif
 
 #pragma GCC diagnostic pop
 
@@ -776,7 +775,7 @@ void characters_unit(void* ctx, const xmlChar* ch, int len) {
     if (!state->collect_unit_body)
         return;
 
-    state->unitsrc.append((const char*) ch, len);
+    state->unitsrc.append((const char*) ch, static_cast<size_t>(len));
 
     state->loc += (int) std::count((const char*) ch, (const char*) ch + len, '\n');
 
@@ -784,7 +783,7 @@ void characters_unit(void* ctx, const xmlChar* ch, int len) {
 
     // end previous start element
     if (state->base[0] == '>') {
-        state->unitsrcml.append(1, '>');
+        state->unitsrcml += '>';
         state->base += 1;
     }
 
@@ -793,7 +792,7 @@ void characters_unit(void* ctx, const xmlChar* ch, int len) {
     if (state->base == ctxt->input->cur) {
 
         // plain old strings
-        state->unitsrcml.append((const char*) ch, len);
+        state->unitsrcml.append((const char*) ch, static_cast<std::size_t>(len));
 
         // libxml2 passes ctxt->input->cur as ch, so then must increment to len
         state->base = ctxt->input->cur + len;
@@ -801,11 +800,22 @@ void characters_unit(void* ctx, const xmlChar* ch, int len) {
     } else {
 
         // whitespace and escaped characters
-        state->unitsrcml.append((const char*) state->base, ctxt->input->cur - state->base);
+        if (*ch == '<')
+            for (auto c : "&lt;"sv)
+                state->unitsrcml += c;
+        else if (*ch == '>')
+            for (auto c : "&gt;"sv)
+                state->unitsrcml += c;
+        else if (*ch == '&')
+            for (auto c : "&amp;"sv)
+                state->unitsrcml += c;
+        else
+            state->unitsrcml.append((const char*) ch, static_cast<std::size_t>(len));
+
         state->base = ctxt->input->cur;
     }
 
-    SRCML_DEBUG("UNIT", state->unitsrcml.c_str(), state->unitsrcml.size());
+    SRCML_DEBUG("UNIT", state->unitsrcml.data(), state->unitsrcml.size());
 
     BASE_DEBUG
 
@@ -836,9 +846,11 @@ void comment(void* ctx, const xmlChar* value) {
     if (state->collect_unit_body) {
 
         // take the value but note it could be part of inter-unit
-        state->unitsrcml.append("<!--");
+        for (auto c : "<!--"sv)
+            state->unitsrcml += c;
         state->unitsrcml.append((const char*) value);
-        state->unitsrcml.append("-->");
+        for (auto c : "-->"sv)
+            state->unitsrcml += c;
     }
 
     state->base = ctxt->input->cur;
@@ -872,10 +884,10 @@ void cdata_block(void* ctx, const xmlChar* value, int len) {
     if (state->collect_unit_body) {
 
         // xml can get raw
-        state->unitsrcml.append((const char*) state->base, ctxt->input->cur - state->base);
+        state->unitsrcml.append((const char*) state->base, static_cast<std::size_t>(ctxt->input->cur - state->base));
 
         // CDATA is character data
-        state->unitsrc.append((const char*) value, len);
+        state->unitsrc.append((const char*) value, static_cast<std::size_t>(len));
 
         state->base = ctxt->input->cur;
     }
@@ -907,7 +919,7 @@ void processing_instruction(void* ctx, const xmlChar* /* target */, const xmlCha
 
     if (state->collect_unit_body) {
 
-        state->unitsrcml.append((const char*) state->base, ctxt->input->cur - state->base);
+        state->unitsrcml.append((const char*) state->base, static_cast<std::size_t>(ctxt->input->cur - state->base));
 
         state->base = ctxt->input->cur;
     }

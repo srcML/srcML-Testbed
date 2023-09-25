@@ -1,31 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file test_srcml_clear_transforms.cpp
  *
  * @copyright Copyright (C) 2013-2019 srcML, LLC. (www.srcML.org)
  *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ * Test cases for srcml_clear_transforms()
  */
 
-/*
-
-  Test cases for srcml_clear_transforms
-*/
-
 #include <srcml.h>
-
-#include <macros.hpp>
 
 #include <fstream>
 
@@ -94,9 +77,9 @@ int main(int, char* argv[]) {
 
     {
         srcml_archive* archive = srcml_archive_create();
-        int fd = OPEN("copy.xsl", O_RDONLY, 0);
+        int fd = open("copy.xsl", O_RDONLY, 0);
         srcml_append_transform_xslt_fd(archive, fd);
-        CLOSE(fd);
+        close(fd);
         dassert(srcml_clear_transforms(archive), SRCML_STATUS_OK);
         srcml_archive_free(archive);
     }
@@ -126,9 +109,9 @@ int main(int, char* argv[]) {
 
     {
         srcml_archive* archive = srcml_archive_create();
-        int fd = OPEN("schema.rng", O_RDONLY, 0);
+        int fd = open("schema.rng", O_RDONLY, 0);
         srcml_append_transform_relaxng_fd(archive, fd);
-        CLOSE(fd);
+        close(fd);
         dassert(srcml_clear_transforms(archive), SRCML_STATUS_OK);
         srcml_archive_free(archive);
     }
@@ -143,18 +126,18 @@ int main(int, char* argv[]) {
         FILE* f = fopen("copy.xsl", "r");
         srcml_append_transform_xslt_FILE(archive, f);
         fclose(f);
-        int fd = OPEN("copy.xsl", O_RDONLY, 0);
+        int fd = open("copy.xsl", O_RDONLY, 0);
         srcml_append_transform_xslt_fd(archive, fd);
-        CLOSE(fd);
+        close(fd);
 
         srcml_append_transform_relaxng_filename(archive, "schema.rng");
         srcml_append_transform_relaxng_memory(archive, schema.c_str(), schema.size());
         f = fopen("schema.rng", "r");
         srcml_append_transform_relaxng_FILE(archive, f);
         fclose(f);
-        fd = OPEN("schema.rng", O_RDONLY, 0);
+        fd = open("schema.rng", O_RDONLY, 0);
         srcml_append_transform_relaxng_fd(archive, fd);
-        CLOSE(fd);
+        close(fd);
 
         dassert(srcml_clear_transforms(archive), SRCML_STATUS_OK);
         srcml_archive_free(archive);

@@ -1,36 +1,26 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file srcml_cli.hpp
  *
  * @copyright Copyright (C) 2014-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #ifndef SRCML_CLI_HPP
 #define SRCML_CLI_HPP
 
-#include <srcml.h>
+// #include <srcml.h>
 #include <string>
 #include <vector>
-#include <boost/optional.hpp>
+#include <optional>
 #include <iostream>
 #include <utility>
 #include <map>
 #include <srcml_input_src.hpp>
+#include <string_view>
+#include <memory>
+#include <libarchive_utilities.hpp>
 
 // Internal srcml command options
 const int SRCML_COMMAND_LONGINFO                  = 1<<0;
@@ -79,6 +69,8 @@ const int SRCML_COMMAND_PARSER_TEST               = 1<<29;
 
 const int SRCML_COMMAND_CAT_XML                   = 1<<30;
 
+const int SRCML_COMMAND_NULL                      = 1<<31;
+
 // commands that are simple queries on srcml
 const int SRCML_COMMAND_INSRCML =
     SRCML_COMMAND_LONGINFO |
@@ -101,50 +93,50 @@ const int CLI_STATUS_ERROR = 1;
 const int CLI_STATUS_INTERNAL_ERROR = 2;
 
 struct attribute {
-    boost::optional<std::string> prefix;
-    boost::optional<std::string> name;
-    boost::optional<std::string> value;
+    std::optional<std::string> prefix;
+    std::optional<std::string> name;
+    std::optional<std::string> value;
 };
 
 struct element {
-    boost::optional<std::string> prefix;
-    boost::optional<std::string> name;
+    std::optional<std::string> prefix;
+    std::optional<std::string> name;
 };
 
 // request for srcml client processing
 struct srcml_request_t {
     srcml_input_t input_sources;
 
-    boost::optional<int> stdindex;
+    std::optional<std::size_t> stdindex;
 
     int command = 0;
-    boost::optional<int> markup_options;
+    std::optional<int> markup_options;
 
     // unit attributes
-    boost::optional<std::string> att_language;
-    boost::optional<std::string> att_filename;
-    boost::optional<std::string> att_url;
-    boost::optional<std::string> att_xml_encoding;
-    boost::optional<std::string> att_version;
+    std::optional<std::string> att_language;
+    std::optional<std::string> att_filename;
+    std::optional<std::string> att_url;
+    std::optional<std::string> att_xml_encoding;
+    std::optional<std::string> att_version;
 
-    boost::optional<std::string> src_encoding;
+    std::optional<std::string> src_encoding;
 
-    boost::optional<int> eol;
+    std::optional<size_t> eol;
 
-    boost::optional<std::string> external;
+    std::optional<std::string> external;
 
     srcml_output_dest output_filename;
 
     //filelist:// prefix
     std::vector<std::string> files_from;
     std::vector<std::string> language_ext;
-    int tabs;
+    size_t tabs;
 
     // xml namespaces
-    boost::optional<std::string> xmlns_prefix_query;
+    std::optional<std::string> xmlns_prefix_query;
 
     // xml processing attributes
-    boost::optional<std::string> xml_processing;
+    std::optional<std::string> xml_processing;
 
     std::map<std::string,std::string> xmlns_namespaces;
 
@@ -153,14 +145,14 @@ struct srcml_request_t {
 
     // srcml transformation
     std::vector<std::string> transformations;
-    std::vector< std::pair< boost::optional<element>, boost::optional<attribute> > > xpath_query_support;
+    std::vector< std::pair< std::optional<element>, std::optional<attribute> > > xpath_query_support;
 
     int unit = 0;
     int max_threads;
 
-    boost::optional<std::string> pretty_format;
+    std::optional<std::string> pretty_format;
 
-    boost::optional<size_t> revision;
+    std::optional<size_t> revision;
 
     // pre-input
     char buf[4] = { 0 };

@@ -57,10 +57,52 @@ jobs:
           cpack -G WIX -V
 
       - shell: bash
+=======
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup Ubuntu
+        shell: bash
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt install antlr libantlr-dev libantlr-java libarchive-dev \
+                           libcurl4-openssl-dev libxml2-utils libxslt1-dev \
+                           ninja-build
+          curl -L http://www.sdml.cs.kent.edu/build/srcML-1.0.0-Boost.tar.gz | \
+              sudo tar xz -C /usr/local/include
+
+      - name: Setup macOS
+        shell: bash
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install ninja antlr2 --display-times
+          curl -L http://www.sdml.cs.kent.edu/build/srcML-1.0.0-Boost.tar.gz | \
+            sudo tar xz -C /usr/local/include
+
+      - name: Setup Windows
+        uses: microsoft/setup-msbuild@v1
+        if: ${{ matrix.os == 'windows-latest' }}
+
+      - name: Create build directory
+        shell: bash
+        run: mkdir build
+
+      - name: CMake Setup on Windows
+        shell: bash
+        if: ${{ matrix.os == 'windows-latest' }}
+        working-directory: build
+        run: |
+          export UseMultiToolTask=true
+          cmake ..
+
+      - name: CMake Setup on Ubuntu/macOS
+        shell: bash
+>>>>>>> upstream/issue1942
         if: ${{ matrix.os != 'windows-latest' }}
         working-directory: build
         run: |
           cmake .. -G Ninja
+<<<<<<< HEAD
           sudo cmake --build . --config Release --target install
 
       - working-directory: build/dist
@@ -82,10 +124,51 @@ jobs:
 
       - shell: bash
         if: matrix.os == 'macos-latest'
+=======
+
+      - name: Build
+        shell: bash
+        working-directory: build
+        run: |
+          export UseMultiToolTask=true
+          cmake --build . --config Release
+
+      - name: Install on Windows
+        shell: bash
+        if: ${{ matrix.os == 'windows-latest' }}
+        working-directory: build
+        run: |
+          cmake --build . --config Release --target install
+
+      - name: Install on Ubuntu/macOS
+        shell: bash
+        if: ${{ matrix.os != 'windows-latest' }}
+        working-directory: build
+        run: |
+          sudo cmake --build . --config Release --target install
+
+      - name: Finish install for Ubuntu
+        shell: bash
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        working-directory: build
+        run: |
+          sudo ldconfig
+
+      - name: Set PATH for Windows
+        shell: bash
+        if: ${{ matrix.os == 'windows-latest' }}
+        working-directory: build
+        run: |
+          echo "/c/Program Files (x86)/srcML/bin" >> $GITHUB_PATH
+
+      - name: Run Installed srcml
+        shell: bash
+>>>>>>> upstream/issue1942
         working-directory: build
         run: |
           srcml --version
           srcml --text="int a;" -l C++
+<<<<<<< HEAD
 
       - shell: bash
         if: matrix.os == 'windows-latest'
@@ -93,3 +176,5 @@ jobs:
         run: |
           srcml.exe --version
           srcml.exe --text="int a;" -l C++
+=======
+>>>>>>> upstream/issue1942

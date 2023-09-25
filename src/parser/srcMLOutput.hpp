@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file srcMLOutput.hpp
  *
@@ -5,38 +6,22 @@
  *
  * This file is part of the srcML Toolkit.
  *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcML Toolkit; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ * XML output
  */
-
-/**
-   XML output
-*/
 
 #ifndef SRCMLOUTPUT_HPP
 #define SRCMLOUTPUT_HPP
 
-#include "antlr/Token.hpp"
-#include "srcMLParserTokenTypes.hpp"
-#include <antlr/TokenStream.hpp>
-#include "StreamMLParser.hpp"
-#include "TokenStream.hpp"
-#include "srcMLException.hpp"
+#include <antlr/Token.hpp>
+#include <TokenStream.hpp>
+#include <srcMLException.hpp>
 #include <string>
+#include <string_view>
 #include <unordered_map>
-#include "srcmlns.hpp"
+#include <srcml_options.hpp>
 #include <libxml/xmlwriter.h>
+#include <srcmlns.hpp>
+#include <optional>
 
 /**
  * anonymous enum for prefix positions
@@ -65,7 +50,7 @@ struct Element {
  * Class for output of srcML. Consumes produced tokens.
  * progressively running the srcML parser and consuming tokens i.e. like a pull parser.
  */
-class srcMLOutput : public srcMLParserTokenTypes {
+class srcMLOutput {
 public:
     // constructor
     srcMLOutput(TokenStream* ints,
@@ -74,7 +59,7 @@ public:
                 const char* encoding,
                 OPTION_TYPE& option,
                 const std::vector<std::string>& attributes,
-                const boost::optional<std::pair<std::string, std::string>>& processing_instruction,
+                const std::optional<std::pair<std::string, std::string>>& processing_instruction,
                 size_t tabsize);
 
     void initNamespaces(const Namespaces& namespaces);
@@ -121,7 +106,7 @@ public:
 private:
     // standard processing of text
     void processText(const antlr::RefToken& token);
-    void processText(const std::string&);
+    void processText(std::string_view);
     void processText(const char* s, int size);
 
     // adds the position attributes to a token
@@ -174,7 +159,7 @@ public:
     const std::vector<std::string> unit_attributes;
 
     /** pre-root processing instruction */
-    boost::optional<std::pair<std::string, std::string> > processing_instruction;
+    std::optional<std::pair<std::string, std::string> > processing_instruction;
 
     /** number of open elements */
     int openelementcount = 0;
@@ -188,7 +173,7 @@ public:
     /** user defined macro list */
     std::vector<std::string> user_macro_list;
 
-    void outputNamespaces(xmlTextWriterPtr xout, const OPTION_TYPE& options, int depth);
+    void outputNamespaces();
 
     void setMacroList(std::vector<std::string> & list);
 

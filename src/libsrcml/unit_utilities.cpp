@@ -1,28 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * @file unit_utilities.cpp
  *
  * @copyright Copyright (C) 2018-2019 srcML, LLC. (www.srcML.org)
  *
  * This file is part of the srcml command-line client.
- *
- * The srcML Toolkit is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * The srcML Toolkit is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with the srcml command-line client; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <unit_utilities.hpp>
 #include <libxml/parserInternals.h>
 #include <stack>
+#include <cstring>
+#include <string_view>
+
+using namespace ::std::literals::string_view_literals;
 
 // Update unit attributes with xml parsed attributes
 void unit_update_attributes(srcml_unit* unit, int num_attributes, const xmlChar** attributes) {
@@ -30,24 +21,23 @@ void unit_update_attributes(srcml_unit* unit, int num_attributes, const xmlChar*
     // collect attributes
     for (int pos = 0; pos < num_attributes; ++pos) {
 
-        std::string attribute = (const char*) attributes[pos * 5];
-        std::string value((const char *)attributes[pos * 5 + 3], attributes[pos * 5 + 4] - attributes[pos * 5 + 3]);
-
-        if (attribute == "timestamp")
-            srcml_unit_set_timestamp(unit, value.c_str());
-        else if (attribute == "hash")
-            srcml_unit_set_hash(unit, value.c_str());
-        else if (attribute == "language")
-            srcml_unit_set_language(unit, value.c_str());
-        else if (attribute == "revision")
+        std::string_view attribute = (const char*) attributes[pos * 5];
+        std::string value((const char *)attributes[pos * 5 + 3], static_cast<size_t>(attributes[pos * 5 + 4] - attributes[pos * 5 + 3]));
+        if (attribute == "timestamp"sv)
+            srcml_unit_set_timestamp(unit, value.data());
+        else if (attribute == "hash"sv)
+            srcml_unit_set_hash(unit, value.data());
+        else if (attribute == "language"sv)
+            srcml_unit_set_language(unit, value.data());
+        else if (attribute == "revision"sv)
             unit->revision = value;
-        else if (attribute == "filename")
-            srcml_unit_set_filename(unit, value.c_str());
-        else if (attribute == "url")
+        else if (attribute == "filename"sv)
+            srcml_unit_set_filename(unit, value.data());
+        else if (attribute == "url"sv)
             unit->url = value;
-        else if (attribute == "version")
-            srcml_unit_set_version(unit, value.c_str());
-        else if (attribute == "tabs" || attribute == "options" || attribute == "hash")
+        else if (attribute == "version"sv)
+            srcml_unit_set_version(unit, value.data());
+        else if (attribute == "tabs"sv || attribute == "options"sv)
             ;
         else {
             // if we already have the attribute, then just update the value
@@ -61,42 +51,44 @@ void unit_update_attributes(srcml_unit* unit, int num_attributes, const xmlChar*
                 }
             }
             if (!found) {
-                unit->attributes.push_back(attribute);
-                unit->attributes.push_back(value);
+                unit->attributes.emplace_back(attribute);
+                unit->attributes.emplace_back(std::move(value));
             }
         }
     }
 }
 
-enum { INSERT, DELETE, COMMON};
+#undef DELETE
+
+enum { INSERT, DELETE, COMMON };
 
 std::string extract_revision(const char* srcml, int size, int revision, bool text_only) {
 
-    const char* DIFF_PREFIX = "diff:";
+    std::string_view DIFF_PREFIX = "diff:"sv;
 
     std::stack<int> mode;
     mode.push(COMMON);
 
     std::string news;
     const char* p = srcml;
-    const char* lp = p;
-    while ((p = (const char*) memchr(p, '<', size - (p - srcml)))) {
+    const char* lastp = p;
+    while ((p = (const char*) memchr(p, '<', static_cast<size_t>(size - (p - srcml))))) {
 
         bool inmode = mode.top() == COMMON || (revision == 0 && mode.top() == DELETE) || (revision == 1 && mode.top() == INSERT);
 
         // output previous non-tag text
         if (inmode)
-            news.append(lp, p - lp);
+            news.append(lastp, static_cast<size_t>(p - lastp));
 
         auto sp = p;
 
         // skip to end of tag
-        p = (const char*) memchr(p, '>', size - (p - srcml));
+        p = (const char*) memchr(p, '>', static_cast<size_t>(size - (p - srcml)));
         ++p;
 
-        if (strncmp(sp + 1, DIFF_PREFIX, strlen(DIFF_PREFIX)) == 0) {
+        if (strncmp(sp + 1, DIFF_PREFIX.data(), DIFF_PREFIX.size()) == 0) {
 
-            const char* tstart = sp + 1 + strlen(DIFF_PREFIX);
+            const char* tstart = sp + 1 + DIFF_PREFIX.size();
 
             if (strncmp(tstart, "delete", 6) == 0) {
                 mode.push(DELETE);
@@ -106,15 +98,15 @@ std::string extract_revision(const char* srcml, int size, int revision, bool tex
                 mode.push(COMMON);
             }
         }
-        else if (*(sp + 1) == '/' && strncmp(sp + 2, DIFF_PREFIX, strlen(DIFF_PREFIX)) == 0) {
+        else if (*(sp + 1) == '/' && strncmp(sp + 2, DIFF_PREFIX.data(), DIFF_PREFIX.size()) == 0) {
             mode.pop();
         }
         else {
             if (inmode && !text_only)
-                news.append(sp, p - sp);
+                news.append(sp, static_cast<size_t>(p - sp));
         }
 
-        lp = p;
+        lastp = p;
     }
 
     return news;
@@ -122,12 +114,12 @@ std::string extract_revision(const char* srcml, int size, int revision, bool tex
 
 struct extract_context {
     std::string s;
-    boost::optional<int> revision;
+    std::optional<int> revision;
     std::stack<int> mode;
 };
 
 // Extract source code from srcml
-std::string extract_src(const std::string& srcml, boost::optional<int> revision) {
+std::string extract_src(std::string_view srcml, std::optional<int> revision) {
 
     extract_context scontext;
     scontext.revision = revision;
@@ -147,7 +139,7 @@ std::string extract_src(const std::string& srcml, boost::optional<int> revision)
         if (scontext == nullptr)
             return;
 
-        scontext->s.append((const char*) ch, len);
+        scontext->s.append((const char*) ch, static_cast<size_t>(len));
     };
 
     charactersax.startElementNs = [](void* ctx, const xmlChar* localname, const xmlChar* /* prefix */, const xmlChar* URI,
@@ -161,25 +153,26 @@ std::string extract_src(const std::string& srcml, boost::optional<int> revision)
         if (scontext == nullptr)
             return;
 
-        if (strcmp((const char*) localname, "escape") == 0 && strcmp((const char*) URI, SRCML_SRC_NS_URI) == 0) {
-            std::string svalue((const char *)attributes[0 * 5 + 3], attributes[0 * 5 + 4] - attributes[0 * 5 + 3]);
+        if ("escape"sv == (const char*) localname && "http://www.srcML.org/srcML/src"sv == (const char*) URI) {
+            std::string svalue((const char *)attributes[0 * 5 + 3], static_cast<std::size_t>(attributes[0 * 5 + 4] - attributes[0 * 5 + 3]));
 
-            char value = (int)strtol(svalue.c_str(), NULL, 0);
+            // use strtol() instead of atoi() since strtol() understands hex encoding of '0x0?'
+            char value = (char)strtol(svalue.data(), NULL, 0);
 
             scontext->s.append(1, value);
 
-        } else if (scontext->revision && strcmp((const char*) URI, SRCML_DIFF_NS_URI) == 0) {
+        } else if (scontext->revision && SRCML_DIFF_NS_URI == (const char*) URI) {
 
-            if (std::string((const char*) localname) == "INSERT")
+            if ((const char*) localname == "INSERT"sv)
                 scontext->mode.push(INSERT);
-            else if (std::string((const char*) localname) == "DELETE")
+            else if ((const char*) localname == "DELETE"sv)
                 scontext->mode.push(DELETE);
             else
                 scontext->mode.push(COMMON);
         }
     };
 
-    xmlParserCtxtPtr context = xmlCreateMemoryParserCtxt(srcml.c_str(), (int) srcml.size());
+    xmlParserCtxtPtr context = xmlCreateMemoryParserCtxt(srcml.data(), (int) srcml.size());
     auto save_private = context->_private;
     context->_private = &scontext;
     auto save_sax = context->sax;
@@ -195,7 +188,7 @@ std::string extract_src(const std::string& srcml, boost::optional<int> revision)
     return scontext.s;
 }
 
-std::string attribute_revision(const std::string& attribute, int revision) {
+std::string_view attribute_revision(std::string_view attribute, int revision) {
 
     auto pos = attribute.find('|');
     if (pos == std::string::npos)
